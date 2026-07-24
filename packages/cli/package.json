@@ -1,6 +1,6 @@
 {
   "name": "@hadk/cli",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "hadk — the AI-native Competition Engineering Harness CLI",
   "type": "module",
   "main": "dist/index.js",
@@ -26,6 +26,7 @@
     "@hadk/validators": "workspace:*",
     "@hadk/hyperframes-adapter": "workspace:*",
     "@hadk/agent-adapters": "workspace:*",
+    "ajv": "^6.15.0",
     "commander": "^12.1.0",
     "picocolors": "^1.1.1"
   },

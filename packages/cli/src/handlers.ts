@@ -24,9 +24,15 @@ import { StateStore } from '@hadk/state-store';
 import { Orchestrator, scoreIdea } from '@hadk/orchestrator';
 import { validateRegistry } from '@hadk/validators';
 import { AgentAdapters } from '@hadk/agent-adapters';
+import Ajv from 'ajv';
 import { existsSync, readFileSync, accessSync, constants, statSync } from 'node:fs';
-import { join, delimiter } from 'node:path';
+import { join, delimiter, resolve } from 'node:path';
 import { success, info, warn, fail } from './index.js';
+
+const ideaImportSchema = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, '../../../schemas/idea-import.schema.json'), 'utf-8'),
+);
+const validateIdeaImportShape = new Ajv({ allErrors: true }).compile(ideaImportSchema);
 
 // ─── setup ───────────────────────────────────────────────────────────────────
 
@@ -414,6 +420,10 @@ export async function cmdIdeaImport(store: StateStore, filePath: string): Promis
 
   const result = readYamlFile<{ schema_version?: string; candidates: CandidateIdea[]; selected: SelectedIdea }>(filePath);
   if (!result.ok) return fail(`Could not read idea result file: ${result.error.message}`);
+  if (!validateIdeaImportShape(result.value)) {
+    const issues = (validateIdeaImportShape.errors ?? []).map((issue: { instancePath?: string; dataPath?: string; message?: string }) => `${issue.instancePath || issue.dataPath || '(root)'} ${issue.message}`);
+    return fail(`Imported file does not match schemas/idea-import.schema.json: ${issues.join('; ')}`);
+  }
   const { schema_version: schemaVersion, candidates, selected } = result.value;
   if (schemaVersion !== '1.0') {
     return fail('Imported file must declare `schema_version: "1.0"` (see schemas/idea-import.schema.json).');
@@ -425,41 +435,12 @@ export async function cmdIdeaImport(store: StateStore, filePath: string): Promis
     return fail('Imported file must contain a `selected` object with a `name`.');
   }
 
-  const requiredCandidateFields = [
-    'id', 'name', 'one_liner', 'target_user', 'problem', 'solution', 'core_mechanism',
-    'strategy_mode_fit', 'taste_fit', 'rubric_fit', 'sponsor_fit', 'demo_flow', 'wow_moment',
-    'build_plan_summary', 'estimated_hours', 'critical_dependencies', 'fallbacks', 'failure_modes',
-    'score_breakdown', 'total_score',
-  ];
-  for (const [index, candidate] of candidates.entries()) {
-    if (!candidate || typeof candidate !== 'object') return fail(`Candidate ${index + 1} must be an object.`);
-    for (const field of requiredCandidateFields) {
-      const value = (candidate as unknown as Record<string, unknown>)[field];
-      if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
-        return fail(`Candidate ${index + 1} is missing required field \`${field}\`.`);
-      }
-    }
-    if (typeof candidate.score_breakdown !== 'object' || candidate.score_breakdown === null || Array.isArray(candidate.score_breakdown)) {
-      return fail(`Candidate ${index + 1} has an invalid \`score_breakdown\`.`);
-    }
-    for (const [axis, score] of Object.entries(candidate.score_breakdown)) {
-      if (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 10) {
-        return fail(`Candidate ${index + 1} score \`${axis}\` must be a number from 0 to 10.`);
-      }
-    }
-  }
-
-  const requiredSelectedFields = ['id', 'name', 'selection_reason', 'why_now', 'why_this_team', 'why_this_competition', 'judge_memory_hook', 'core_demo_proof', 'primary_risk', 'fallback'];
-  for (const field of requiredSelectedFields) {
-    const value = (selected as unknown as Record<string, unknown>)[field];
-    if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
-      return fail(`Imported selected idea is missing required field \`${field}\`.`);
-    }
-  }
-
-  const selectedCandidate = candidates.find((candidate) => candidate.id === selected.id || candidate.name === selected.name);
+  const selectedCandidate = candidates.find((candidate) => candidate.id === selected.id);
   if (!selectedCandidate) {
-    return fail(`Selected idea "${selected.name}" must match a candidate by id or name.`);
+    return fail(`Selected idea id "${selected.id}" must match a candidate.`);
+  }
+  if (selectedCandidate.name !== selected.name) {
+    return fail(`Selected idea id "${selected.id}" and name "${selected.name}" refer to different candidates.`);
   }
 
   // Agent-provided totals are advisory. Recalculate against the active strategy

@@ -1,6 +1,6 @@
 {
   "name": "@hadk/orchestrator",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "HADK harness orchestrator — phase detection, gate checks, next-action recommendation, deadline policies",
   "type": "module",
   "main": "dist/index.js",

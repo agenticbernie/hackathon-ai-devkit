@@ -79,5 +79,6 @@ describe('hadk replan', () => {
     expect(state.architecture.invalidation_reason).toBe('changed demo target');
     expect(state.delivery.phase).toBe('scope');
     expect(state.delivery.risks.some((r: { description: string }) => r.description.includes('changed demo target'))).toBe(true);
+    expect(store.listCheckpoints().some((checkpoint) => checkpoint.label === 'pre-replan')).toBe(true);
   });
 });

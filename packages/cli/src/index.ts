@@ -15,7 +15,7 @@ import { AgentAdapters } from '@hadk/agent-adapters';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-function persistRenderFailure(st: StateStore, blocker: string): void {
+export function persistRenderFailure(st: StateStore, blocker: string): void {
   const attemptedAt = new Date().toISOString();
   st.update((s) => {
     s.delivery.video_status = 'failed';

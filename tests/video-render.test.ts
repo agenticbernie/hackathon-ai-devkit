@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { StateStore } from '@hadk/state-store';
 import { HyperFramesAdapter } from '@hadk/hyperframes-adapter';
 import type { CompetitionState } from '@hadk/core';
+import { readYamlFile } from '@hadk/core';
+import { persistRenderFailure } from '@hadk/cli';
 
 let dir: string;
 let store: StateStore;
@@ -114,5 +116,22 @@ describe('HyperFrames video project generation', () => {
     const state = loaded.value;
     expect(state.delivery.phase).toBe('video');
     expect(state.gates.video_gate).toBe('pending');
+  });
+
+  it('persists render failures in state and a report', () => {
+    persistRenderFailure(store, 'HyperFrames CLI unavailable');
+    const loaded = store.load();
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.value.delivery.video_status).toBe('failed');
+    expect(loaded.value.gates.video_gate).toBe('failed');
+
+    const report = readYamlFile<{ status: string; blocker: string }>(
+      store.artifactPath('video', 'render-report.yaml'),
+    );
+    expect(report.ok).toBe(true);
+    if (!report.ok) return;
+    expect(report.value.status).toBe('failed');
+    expect(report.value.blocker).toContain('unavailable');
   });
 });
