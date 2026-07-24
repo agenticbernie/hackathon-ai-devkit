@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/startup-pilot-designer.output.schema.json",
+  "title": "Startup Pilot Designer — Output",
+  "description": "Output contract for the startup-pilot-designer skill. Design a credible pilot / lighthouse-customer plan that generates traction evidence.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "artifact": {
+      "type": "string",
+      "description": "Path to the persisted artifact under .hackathon/artifacts/."
+    },
+    "recommended_skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Next skills to invoke."
+    }
+  }
+}

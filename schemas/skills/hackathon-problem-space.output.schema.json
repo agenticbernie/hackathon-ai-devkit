@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-problem-space.output.schema.json",
+  "title": "Hackathon Problem Space — Output",
+  "description": "Output contract for the hackathon-problem-space skill. Map the problem space for a chosen track: problem statement, solution gaps, and user segments.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "artifact": {
+      "type": "string",
+      "description": "Path to the persisted artifact under .hackathon/artifacts/."
+    },
+    "recommended_skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Next skills to invoke."
+    }
+  }
+}

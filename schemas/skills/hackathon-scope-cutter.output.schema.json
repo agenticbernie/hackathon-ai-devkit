@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-scope-cutter.output.schema.json",
+  "title": "Hackathon Scope Cutter — Output",
+  "description": "Output contract for the hackathon-scope-cutter skill. Cut and lock a machine-readable MVP scope contract: demo flow, MVP features, deferred features, wow moment, time budget.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "artifact": {
+      "type": "string",
+      "description": "Path to the persisted artifact under .hackathon/artifacts/."
+    },
+    "recommended_skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Next skills to invoke."
+    }
+  }
+}

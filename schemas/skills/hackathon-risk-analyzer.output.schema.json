@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-risk-analyzer.output.schema.json",
+  "title": "Hackathon Risk Analyzer — Output",
+  "description": "Output contract for the hackathon-risk-analyzer skill. Surface critical technical and schedule risks in the locked scope and attach a fallback to each.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "artifact": {
+      "type": "string",
+      "description": "Path to the persisted artifact under .hackathon/artifacts/."
+    },
+    "recommended_skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Next skills to invoke."
+    }
+  }
+}

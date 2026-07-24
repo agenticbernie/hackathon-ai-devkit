@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/schemas/scaffold-plan.schema.json",
+  "title": "HADK Scaffold Plan",
+  "description": "The resolved plan produced by the scaffold engine before files are written. Derived from the selected idea, locked scope, demo flow, feature list, and architecture profile.",
+  "type": "object",
+  "required": ["profile", "project_name", "output_dir", "features", "files", "startup_command", "health_check"],
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "type": "string",
+      "description": "Scaffold profile id, e.g. web-ai-fullstack, web-ai-split, blockchain."
+    },
+    "project_name": { "type": "string", "minLength": 1 },
+    "output_dir": { "type": "string", "minLength": 1 },
+    "features": { "type": "array", "items": { "type": "string" } },
+    "feature_mapping": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "routes": { "type": "array", "items": { "type": "string" } },
+          "ui": { "type": "array", "items": { "type": "string" } },
+          "services": { "type": "array", "items": { "type": "string" } },
+          "tests": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "overwrite"],
+        "properties": {
+          "path": { "type": "string" },
+          "template": { "type": ["string", "null"] },
+          "content_hash": { "type": ["string", "null"] },
+          "overwrite": { "type": "boolean" }
+        }
+      }
+    },
+    "post_install_commands": { "type": "array", "items": { "type": "string" } },
+    "startup_command": { "type": "string" },
+    "health_check": { "type": "string" }
+  }
+}

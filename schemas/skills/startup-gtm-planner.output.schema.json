@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/startup-gtm-planner.output.schema.json",
+  "title": "Startup Gtm Planner — Output",
+  "description": "Output contract for the startup-gtm-planner skill. Design a focused go-to-market plan (beachhead segment, channel, first-100-customers path).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "artifact": {
+      "type": "string",
+      "description": "Path to the persisted artifact under .hackathon/artifacts/."
+    },
+    "recommended_skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Next skills to invoke."
+    }
+  }
+}

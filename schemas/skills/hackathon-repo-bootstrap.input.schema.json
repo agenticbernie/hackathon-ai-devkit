@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-repo-bootstrap.input.schema.json",
+  "title": "Hackathon Repo Bootstrap — Input",
+  "description": "Input contract for the hackathon-repo-bootstrap skill. Bootstrap the project repository and architecture profile that implements the locked scope (consumed by the scaffold engine).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "competition": {
+      "type": "object",
+      "description": "Parsed competition intelligence from .hackathon/artifacts/competition."
+    },
+    "state_ref": {
+      "type": "string",
+      "description": "Path to the canonical .hackathon/state.yaml."
+    }
+  }
+}

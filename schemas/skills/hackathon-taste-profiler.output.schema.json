@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-taste-profiler.output.schema.json",
+  "title": "Hackathon Taste Profiler — Output",
+  "description": "Output contract for the hackathon-taste-profiler skill. Build an idea taste profile (market, product layer, technology, business shape, traits) from user selection or automatic inference.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "artifact": {
+      "type": "string",
+      "description": "Path to the persisted artifact under .hackathon/artifacts/."
+    },
+    "recommended_skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Next skills to invoke."
+    }
+  }
+}

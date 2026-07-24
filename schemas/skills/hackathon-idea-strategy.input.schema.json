@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-idea-strategy.input.schema.json",
+  "title": "Hackathon Idea Strategy — Input",
+  "description": "Input contract for the hackathon-idea-strategy skill. Select one of three idea strategy modes (conservative, realistic, futuristic) and lock the scoring profile that governs idea generation.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "competition": {
+      "type": "object",
+      "description": "Parsed competition intelligence from .hackathon/artifacts/competition."
+    },
+    "state_ref": {
+      "type": "string",
+      "description": "Path to the canonical .hackathon/state.yaml."
+    }
+  }
+}

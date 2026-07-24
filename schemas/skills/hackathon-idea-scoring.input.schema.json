@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-idea-scoring.input.schema.json",
+  "title": "Hackathon Idea Scoring — Input",
+  "description": "Input contract for the hackathon-idea-scoring skill. Score candidate ideas against the strategy mode's weighted rubric and select exactly one recommended idea.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "competition": {
+      "type": "object",
+      "description": "Parsed competition intelligence from .hackathon/artifacts/competition."
+    },
+    "state_ref": {
+      "type": "string",
+      "description": "Path to the canonical .hackathon/state.yaml."
+    }
+  }
+}

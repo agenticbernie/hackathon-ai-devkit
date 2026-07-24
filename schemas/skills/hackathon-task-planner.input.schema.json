@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-task-planner.input.schema.json",
+  "title": "Hackathon Task Planner — Input",
+  "description": "Input contract for the hackathon-task-planner skill. Turn the locked scope into an ordered, time-boxed task plan with milestones and owners.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "competition": {
+      "type": "object",
+      "description": "Parsed competition intelligence from .hackathon/artifacts/competition."
+    },
+    "state_ref": {
+      "type": "string",
+      "description": "Path to the canonical .hackathon/state.yaml."
+    }
+  }
+}

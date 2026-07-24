@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-demo-video.input.schema.json",
+  "title": "Hackathon Demo Video — Input",
+  "description": "Input contract for the hackathon-demo-video skill. Produce the submission demo video via the HyperFrames pipeline (storyboard, composition, render).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "competition": {
+      "type": "object",
+      "description": "Parsed competition intelligence from .hackathon/artifacts/competition."
+    },
+    "state_ref": {
+      "type": "string",
+      "description": "Path to the canonical .hackathon/state.yaml."
+    }
+  }
+}

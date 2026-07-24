@@ -1,0 +1,35 @@
+{
+  "name": "@hadk/cli",
+  "version": "2.0.0",
+  "description": "hadk — the AI-native Competition Engineering Harness CLI",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "hadk": "dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@hadk/core": "workspace:*",
+    "@hadk/state-store": "workspace:*",
+    "@hadk/orchestrator": "workspace:*",
+    "@hadk/scaffold-engine": "workspace:*",
+    "@hadk/validators": "workspace:*",
+    "@hadk/hyperframes-adapter": "workspace:*",
+    "@hadk/agent-adapters": "workspace:*",
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-milestone-monitor.input.schema.json",
+  "title": "Hackathon Milestone Monitor — Input",
+  "description": "Input contract for the hackathon-milestone-monitor skill. Monitor progress against milestones and the deadline, triggering scope cuts or replans when at risk.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "competition": {
+      "type": "object",
+      "description": "Parsed competition intelligence from .hackathon/artifacts/competition."
+    },
+    "state_ref": {
+      "type": "string",
+      "description": "Path to the canonical .hackathon/state.yaml."
+    }
+  }
+}

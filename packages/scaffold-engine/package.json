@@ -1,0 +1,25 @@
+{
+  "name": "@hadk/scaffold-engine",
+  "version": "2.0.0",
+  "description": "Scope-driven project scaffold generator for HADK — produces real files from locked scope and profiles",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@hadk/core": "workspace:*",
+    "@hadk/state-store": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

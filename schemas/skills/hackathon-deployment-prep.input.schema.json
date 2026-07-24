@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-deployment-prep.input.schema.json",
+  "title": "Hackathon Deployment Prep — Input",
+  "description": "Input contract for the hackathon-deployment-prep skill. Prepare deployment so the demo is live and reliable: env config, health checks, demo data, rollback plan.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "competition": {
+      "type": "object",
+      "description": "Parsed competition intelligence from .hackathon/artifacts/competition."
+    },
+    "state_ref": {
+      "type": "string",
+      "description": "Path to the canonical .hackathon/state.yaml."
+    }
+  }
+}

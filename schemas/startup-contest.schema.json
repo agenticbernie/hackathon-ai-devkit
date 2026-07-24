@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/schemas/startup-contest.schema.json",
+  "title": "HADK Startup-Contest Validation Bundle",
+  "description": "Aggregated business-validation artifacts for competition.type = startup-contest. Produced by the startup-* extension skills (beta). Stored under .hackathon/artifacts/startup/.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "customer_evidence": {
+      "type": "object",
+      "properties": {
+        "evidence_strength": { "type": "string", "enum": ["weak", "moderate", "strong"] },
+        "pain_frequency": { "type": "string" },
+        "willingness_to_pay_signals": { "type": "array" }
+      }
+    },
+    "market_sizing": {
+      "type": "object",
+      "properties": {
+        "tam": { "type": "number" },
+        "sam": { "type": "number" },
+        "som": { "type": "number" },
+        "method": { "type": "string", "enum": ["bottom-up", "top-down", "mixed"] }
+      }
+    },
+    "competitor_map": {
+      "type": "object",
+      "properties": {
+        "competitors": { "type": "array" },
+        "whitespace": { "type": "string" },
+        "moat_hypothesis": { "type": "string" }
+      }
+    },
+    "business_model": {
+      "type": "object",
+      "properties": {
+        "value_proposition": { "type": "string" },
+        "revenue_streams": { "type": "array" },
+        "unit_economics": { "type": "object" }
+      }
+    },
+    "pricing_hypothesis": {
+      "type": "object",
+      "properties": {
+        "pricing_model": { "type": "string" },
+        "price_point": { "type": "string" },
+        "validation_plan": { "type": "string" }
+      }
+    },
+    "gtm_plan": {
+      "type": "object",
+      "properties": {
+        "beachhead_segment": { "type": "string" },
+        "primary_channel": { "type": "string" },
+        "first_100_plan": { "type": "string" }
+      }
+    },
+    "pilot_plan": {
+      "type": "object",
+      "properties": {
+        "pilot_scope": { "type": "string" },
+        "success_criteria": { "type": "array" }
+      }
+    },
+    "investor_qa": {
+      "type": "object",
+      "properties": {
+        "questions": { "type": "array" },
+        "weak_spots": { "type": "array" }
+      }
+    }
+  }
+}

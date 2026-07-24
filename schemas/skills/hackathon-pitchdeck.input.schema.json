@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-pitchdeck.input.schema.json",
+  "title": "Hackathon Pitchdeck — Input",
+  "description": "Input contract for the hackathon-pitchdeck skill. Assemble the pitch deck narrative: problem, solution, demo, wow moment, and ask — aligned to the rubric.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "competition": {
+      "type": "object",
+      "description": "Parsed competition intelligence from .hackathon/artifacts/competition."
+    },
+    "state_ref": {
+      "type": "string",
+      "description": "Path to the canonical .hackathon/state.yaml."
+    }
+  }
+}

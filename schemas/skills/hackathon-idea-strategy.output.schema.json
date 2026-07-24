@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-idea-strategy.output.schema.json",
+  "title": "Hackathon Idea Strategy — Output",
+  "description": "Output contract for the hackathon-idea-strategy skill. Select one of three idea strategy modes (conservative, realistic, futuristic) and lock the scoring profile that governs idea generation.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "artifact": {
+      "type": "string",
+      "description": "Path to the persisted artifact under .hackathon/artifacts/."
+    },
+    "recommended_skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Next skills to invoke."
+    }
+  }
+}

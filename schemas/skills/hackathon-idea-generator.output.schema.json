@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-idea-generator.output.schema.json",
+  "title": "Hackathon Idea Generator — Output",
+  "description": "Output contract for the hackathon-idea-generator skill. Generate 3-7 candidate project ideas aligned to the problem space, strategy mode, taste profile, and track constraints.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "artifact": {
+      "type": "string",
+      "description": "Path to the persisted artifact under .hackathon/artifacts/."
+    },
+    "recommended_skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Next skills to invoke."
+    }
+  }
+}

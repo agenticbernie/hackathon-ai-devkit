@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/startup-pricing-hypothesis.output.schema.json",
+  "title": "Startup Pricing Hypothesis — Output",
+  "description": "Output contract for the startup-pricing-hypothesis skill. Form and test a concrete pricing hypothesis (model, price point, willingness to pay).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "artifact": {
+      "type": "string",
+      "description": "Path to the persisted artifact under .hackathon/artifacts/."
+    },
+    "recommended_skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Next skills to invoke."
+    }
+  }
+}

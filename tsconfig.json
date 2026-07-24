@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "noEmit": true
+  },
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/state-store" },
+    { "path": "packages/orchestrator" },
+    { "path": "packages/scaffold-engine" },
+    { "path": "packages/validators" },
+    { "path": "packages/hyperframes-adapter" },
+    { "path": "packages/agent-adapters" },
+    { "path": "packages/cli" }
+  ],
+  "include": ["tests/**/*.ts"]
+}

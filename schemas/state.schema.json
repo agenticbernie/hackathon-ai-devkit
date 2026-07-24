@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/schemas/state.schema.json",
+  "title": "HADK Competition State",
+  "description": "Canonical persistent competition state stored at .hackathon/state.yaml. Single source of truth for the harness; never rely on conversational memory.",
+  "type": "object",
+  "required": ["schema_version", "competition", "team", "strategy", "scope", "architecture", "delivery", "gates"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "competition": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "type": { "type": "string", "enum": ["hackathon", "buildathon", "startup-contest"] },
+        "source_url": { "type": ["string", "null"] },
+        "deadline": { "type": ["string", "null"] },
+        "remaining_hours": { "type": ["number", "null"] },
+        "tracks": { "type": "array" },
+        "judging_criteria": { "type": "array" },
+        "sponsor_requirements": { "type": "array" },
+        "disqualifiers": { "type": "array" }
+      }
+    },
+    "team": { "type": "object" },
+    "strategy": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["conservative", "realistic", "futuristic"] },
+        "taste_source": { "type": "string", "enum": ["user", "auto"] },
+        "idea_taste": { "type": "object" },
+        "selected_track": { "type": ["string", "null"] },
+        "selected_idea": { "type": ["object", "null"] },
+        "scoring_profile": { "type": ["object", "null"] }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["unlocked", "locked"] }
+      }
+    },
+    "architecture": { "type": "object" },
+    "delivery": {
+      "type": "object",
+      "required": ["phase"],
+      "properties": {
+        "phase": { "type": "string" },
+        "checkpoints": { "type": "array" }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "required": ["competition_gate", "idea_gate", "scope_gate", "architecture_gate", "build_gate", "demo_gate", "video_gate", "submission_gate"],
+      "properties": {
+        "competition_gate": { "type": "string", "enum": ["pending", "passed", "failed", "skipped"] },
+        "idea_gate": { "type": "string", "enum": ["pending", "passed", "failed", "skipped"] },
+        "scope_gate": { "type": "string", "enum": ["pending", "passed", "failed", "skipped"] },
+        "architecture_gate": { "type": "string", "enum": ["pending", "passed", "failed", "skipped"] },
+        "build_gate": { "type": "string", "enum": ["pending", "passed", "failed", "skipped"] },
+        "demo_gate": { "type": "string", "enum": ["pending", "passed", "failed", "skipped"] },
+        "video_gate": { "type": "string", "enum": ["pending", "passed", "failed", "skipped"] },
+        "submission_gate": { "type": "string", "enum": ["pending", "passed", "failed", "skipped"] }
+      }
+    }
+  }
+}

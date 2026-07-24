@@ -1,0 +1,25 @@
+{
+  "name": "@hadk/orchestrator",
+  "version": "2.0.0",
+  "description": "HADK harness orchestrator — phase detection, gate checks, next-action recommendation, deadline policies",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@hadk/core": "workspace:*",
+    "@hadk/state-store": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/hackathon-idea-generator.input.schema.json",
+  "title": "Hackathon Idea Generator — Input",
+  "description": "Input contract for the hackathon-idea-generator skill. Generate 3-7 candidate project ideas aligned to the problem space, strategy mode, taste profile, and track constraints.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "competition": {
+      "type": "object",
+      "description": "Parsed competition intelligence from .hackathon/artifacts/competition."
+    },
+    "state_ref": {
+      "type": "string",
+      "description": "Path to the canonical .hackathon/state.yaml."
+    }
+  }
+}

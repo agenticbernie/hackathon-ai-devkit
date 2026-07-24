@@ -1,0 +1,412 @@
+# HADK — Central Skill Registry
+# Canonical machine-readable registry of every skill in the devkit.
+# Validated by: hadk validate registry  (packages/validators → validateRegistry)
+schema_version: "1.0"
+
+skills:
+  # ── Competition Intelligence ──────────────────────────────────────────────
+  hackathon-event-parser:
+    version: "1.0.0"
+    phase: competition-intelligence
+    description: "Parse a competition brief (URL or file) into structured competition intelligence: tracks, rubric, sponsors, deadlines, disqualifiers."
+    path: skills/hackathon-event-parser
+    input_schema: schemas/skills/hackathon-event-parser.input.schema.json
+    output_schema: schemas/skills/hackathon-event-parser.output.schema.json
+    dependencies: []
+    optional_dependencies: []
+    produces: [competition]
+    consumes: []
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-track-analyzer:
+    version: "1.0.0"
+    phase: competition-intelligence
+    description: "Analyze competition tracks and sponsor prizes to select the highest-probability track and extract hard constraints."
+    path: skills/hackathon-track-analyzer
+    input_schema: schemas/skills/hackathon-track-analyzer.input.schema.json
+    output_schema: schemas/skills/hackathon-track-analyzer.output.schema.json
+    dependencies: [hackathon-event-parser]
+    optional_dependencies: []
+    produces: [track-analysis]
+    consumes: [competition]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-problem-space:
+    version: "1.0.0"
+    phase: competition-intelligence
+    description: "Map the problem space for a chosen track: problem statement, solution gaps, and user segments."
+    path: skills/hackathon-problem-space
+    input_schema: schemas/skills/hackathon-problem-space.input.schema.json
+    output_schema: schemas/skills/hackathon-problem-space.output.schema.json
+    dependencies: [hackathon-track-analyzer]
+    optional_dependencies: []
+    produces: [problem-space]
+    consumes: [competition, track-analysis]
+    supported_agents: [claude-code, codex, opencode]
+
+  # ── Strategy ──────────────────────────────────────────────────────────────
+  hackathon-idea-strategy:
+    version: "1.0.0"
+    phase: strategy
+    description: "Select one of three idea strategy modes (conservative, realistic, futuristic) and lock the scoring profile that governs idea generation."
+    path: skills/hackathon-idea-strategy
+    input_schema: schemas/skills/hackathon-idea-strategy.input.schema.json
+    output_schema: schemas/skills/hackathon-idea-strategy.output.schema.json
+    dependencies: [hackathon-event-parser]
+    optional_dependencies: [hackathon-track-analyzer]
+    produces: [strategy]
+    consumes: [competition]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-taste-profiler:
+    version: "1.0.0"
+    phase: strategy
+    description: "Build an idea taste profile (market, product layer, technology, business shape, traits) from user selection or automatic inference."
+    path: skills/hackathon-taste-profiler
+    input_schema: schemas/skills/hackathon-taste-profiler.input.schema.json
+    output_schema: schemas/skills/hackathon-taste-profiler.output.schema.json
+    dependencies: [hackathon-idea-strategy]
+    optional_dependencies: []
+    produces: [taste]
+    consumes: [strategy, competition]
+    supported_agents: [claude-code, codex, opencode]
+
+  # ── Ideation ──────────────────────────────────────────────────────────────
+  hackathon-idea-generator:
+    version: "1.0.0"
+    phase: ideation
+    description: "Generate 3-7 candidate project ideas aligned to the problem space, strategy mode, taste profile, and track constraints."
+    path: skills/hackathon-idea-generator
+    input_schema: schemas/skills/hackathon-idea-generator.input.schema.json
+    output_schema: schemas/skills/hackathon-idea-generator.output.schema.json
+    dependencies: [hackathon-idea-strategy, hackathon-taste-profiler]
+    optional_dependencies: [hackathon-problem-space]
+    produces: [ideas]
+    consumes: [strategy, taste, competition, problem-space]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-idea-scoring:
+    version: "1.0.0"
+    phase: ideation
+    description: "Score candidate ideas against the strategy mode's weighted rubric and select exactly one recommended idea."
+    path: skills/hackathon-idea-scoring
+    input_schema: schemas/skills/hackathon-idea-scoring.input.schema.json
+    output_schema: schemas/skills/hackathon-idea-scoring.output.schema.json
+    dependencies: [hackathon-idea-generator]
+    optional_dependencies: []
+    produces: [selected-idea]
+    consumes: [ideas, strategy]
+    supported_agents: [claude-code, codex, opencode]
+
+  # ── Scoping ───────────────────────────────────────────────────────────────
+  hackathon-scope-cutter:
+    version: "1.0.0"
+    phase: scoping
+    description: "Cut and lock a machine-readable MVP scope contract: demo flow, MVP features, deferred features, wow moment, time budget."
+    path: skills/hackathon-scope-cutter
+    input_schema: schemas/skills/hackathon-scope-cutter.input.schema.json
+    output_schema: schemas/skills/hackathon-scope-cutter.output.schema.json
+    dependencies: [hackathon-idea-scoring]
+    optional_dependencies: []
+    produces: [scope]
+    consumes: [selected-idea, competition]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-wow-detector:
+    version: "1.0.0"
+    phase: scoping
+    description: "Identify and sharpen the single primary wow moment that judges will remember, and wire it into the demo flow."
+    path: skills/hackathon-wow-detector
+    input_schema: schemas/skills/hackathon-wow-detector.input.schema.json
+    output_schema: schemas/skills/hackathon-wow-detector.output.schema.json
+    dependencies: [hackathon-scope-cutter]
+    optional_dependencies: []
+    produces: [wow-moment]
+    consumes: [scope]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-risk-analyzer:
+    version: "1.0.0"
+    phase: scoping
+    description: "Surface critical technical and schedule risks in the locked scope and attach a fallback to each."
+    path: skills/hackathon-risk-analyzer
+    input_schema: schemas/skills/hackathon-risk-analyzer.input.schema.json
+    output_schema: schemas/skills/hackathon-risk-analyzer.output.schema.json
+    dependencies: [hackathon-scope-cutter]
+    optional_dependencies: []
+    produces: [risks]
+    consumes: [scope]
+    supported_agents: [claude-code, codex, opencode]
+
+  # ── Architecture & Implementation ─────────────────────────────────────────
+  hackathon-repo-bootstrap:
+    version: "1.0.0"
+    phase: architecture
+    description: "Bootstrap the project repository and architecture profile that implements the locked scope (consumed by the scaffold engine)."
+    path: skills/hackathon-repo-bootstrap
+    input_schema: schemas/skills/hackathon-repo-bootstrap.input.schema.json
+    output_schema: schemas/skills/hackathon-repo-bootstrap.output.schema.json
+    dependencies: [hackathon-scope-cutter]
+    optional_dependencies: []
+    produces: [architecture]
+    consumes: [scope]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-code-implementer:
+    version: "1.0.0"
+    phase: implementation
+    description: "Implement the locked scope feature-by-feature against the generated scaffold, keeping the demo path green."
+    path: skills/hackathon-code-implementer
+    input_schema: schemas/skills/hackathon-code-implementer.input.schema.json
+    output_schema: schemas/skills/hackathon-code-implementer.output.schema.json
+    dependencies: [hackathon-repo-bootstrap]
+    optional_dependencies: [hackathon-task-planner]
+    produces: [build]
+    consumes: [scope, architecture]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-test-generator:
+    version: "1.0.0"
+    phase: implementation
+    description: "Generate smoke tests and a demo-path test for the implemented features to keep the build gate green."
+    path: skills/hackathon-test-generator
+    input_schema: schemas/skills/hackathon-test-generator.input.schema.json
+    output_schema: schemas/skills/hackathon-test-generator.output.schema.json
+    dependencies: [hackathon-code-implementer]
+    optional_dependencies: []
+    produces: [tests]
+    consumes: [build, scope]
+    supported_agents: [claude-code, codex, opencode]
+
+  # ── Demo & Deployment ─────────────────────────────────────────────────────
+  hackathon-demo-script:
+    version: "1.0.0"
+    phase: demo
+    description: "Write a tight, judge-facing demo script that reaches the wow moment fast and rehearse-safe."
+    path: skills/hackathon-demo-script
+    input_schema: schemas/skills/hackathon-demo-script.input.schema.json
+    output_schema: schemas/skills/hackathon-demo-script.output.schema.json
+    dependencies: [hackathon-scope-cutter]
+    optional_dependencies: [hackathon-wow-detector]
+    produces: [demo-script]
+    consumes: [scope, wow-moment]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-demo-video:
+    version: "1.0.0"
+    phase: demo
+    description: "Produce the submission demo video via the HyperFrames pipeline (storyboard, composition, render)."
+    path: skills/hackathon-demo-video
+    input_schema: schemas/skills/hackathon-demo-video.input.schema.json
+    output_schema: schemas/skills/hackathon-demo-video.output.schema.json
+    dependencies: [hackathon-demo-script]
+    optional_dependencies: []
+    produces: [video]
+    consumes: [demo-script, scope]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-deployment-prep:
+    version: "1.0.0"
+    phase: deployment
+    description: "Prepare deployment so the demo is live and reliable: env config, health checks, demo data, rollback plan."
+    path: skills/hackathon-deployment-prep
+    input_schema: schemas/skills/hackathon-deployment-prep.input.schema.json
+    output_schema: schemas/skills/hackathon-deployment-prep.output.schema.json
+    dependencies: [hackathon-code-implementer]
+    optional_dependencies: []
+    produces: [deployment]
+    consumes: [build]
+    supported_agents: [claude-code, codex, opencode]
+
+  # ── Pitch & Submission ────────────────────────────────────────────────────
+  hackathon-pitchdeck:
+    version: "1.0.0"
+    phase: pitch
+    description: "Assemble the pitch deck narrative: problem, solution, demo, wow moment, and ask — aligned to the rubric."
+    path: skills/hackathon-pitchdeck
+    input_schema: schemas/skills/hackathon-pitchdeck.input.schema.json
+    output_schema: schemas/skills/hackathon-pitchdeck.output.schema.json
+    dependencies: [hackathon-scope-cutter]
+    optional_dependencies: [hackathon-wow-detector]
+    produces: [pitch]
+    consumes: [scope, selected-idea, competition]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-judge-simulator:
+    version: "1.0.0"
+    phase: pitch
+    description: "Simulate judge Q&A against the rubric and prepare defensible answers and scoring projections."
+    path: skills/hackathon-judge-simulator
+    input_schema: schemas/skills/hackathon-judge-simulator.input.schema.json
+    output_schema: schemas/skills/hackathon-judge-simulator.output.schema.json
+    dependencies: [hackathon-pitchdeck]
+    optional_dependencies: []
+    produces: [judge-qa]
+    consumes: [pitch, competition]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-submission-prep:
+    version: "1.0.0"
+    phase: submission
+    description: "Assemble and validate the final submission package against every requirement and disqualifier."
+    path: skills/hackathon-submission-prep
+    input_schema: schemas/skills/hackathon-submission-prep.input.schema.json
+    output_schema: schemas/skills/hackathon-submission-prep.output.schema.json
+    dependencies: [hackathon-demo-video]
+    optional_dependencies: [hackathon-doc-writer]
+    produces: [submission]
+    consumes: [video, pitch, competition]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-doc-writer:
+    version: "1.0.0"
+    phase: submission
+    description: "Write the submission README and documentation so judges can run and understand the project instantly."
+    path: skills/hackathon-doc-writer
+    input_schema: schemas/skills/hackathon-doc-writer.input.schema.json
+    output_schema: schemas/skills/hackathon-doc-writer.output.schema.json
+    dependencies: [hackathon-code-implementer]
+    optional_dependencies: []
+    produces: [docs]
+    consumes: [build, scope]
+    supported_agents: [claude-code, codex, opencode]
+
+  # ── Project Management ────────────────────────────────────────────────────
+  hackathon-task-planner:
+    version: "1.0.0"
+    phase: project-management
+    description: "Turn the locked scope into an ordered, time-boxed task plan with milestones and owners."
+    path: skills/hackathon-task-planner
+    input_schema: schemas/skills/hackathon-task-planner.input.schema.json
+    output_schema: schemas/skills/hackathon-task-planner.output.schema.json
+    dependencies: [hackathon-scope-cutter]
+    optional_dependencies: [hackathon-risk-analyzer]
+    produces: [tasks]
+    consumes: [scope, risks]
+    supported_agents: [claude-code, codex, opencode]
+
+  hackathon-milestone-monitor:
+    version: "1.0.0"
+    phase: project-management
+    description: "Monitor progress against milestones and the deadline, triggering scope cuts or replans when at risk."
+    path: skills/hackathon-milestone-monitor
+    input_schema: schemas/skills/hackathon-milestone-monitor.input.schema.json
+    output_schema: schemas/skills/hackathon-milestone-monitor.output.schema.json
+    dependencies: [hackathon-task-planner]
+    optional_dependencies: []
+    produces: [milestones]
+    consumes: [tasks, competition]
+    supported_agents: [claude-code, codex, opencode]
+
+  # ── Startup Contest Extensions (beta) ─────────────────────────────────────
+  startup-customer-evidence:
+    version: "0.1.0"
+    phase: startup-validation
+    status: beta
+    description: "Gather and structure customer evidence (interviews, demand signals, willingness to pay) for a startup-contest submission."
+    path: skills/startup-customer-evidence
+    input_schema: schemas/skills/startup-customer-evidence.input.schema.json
+    output_schema: schemas/skills/startup-customer-evidence.output.schema.json
+    dependencies: [hackathon-idea-scoring]
+    optional_dependencies: []
+    produces: [customer-evidence]
+    consumes: [selected-idea]
+    supported_agents: [claude-code, codex, opencode]
+
+  startup-market-sizing:
+    version: "0.1.0"
+    phase: startup-validation
+    status: beta
+    description: "Estimate market size (TAM/SAM/SOM) with a defensible bottom-up model."
+    path: skills/startup-market-sizing
+    input_schema: schemas/skills/startup-market-sizing.input.schema.json
+    output_schema: schemas/skills/startup-market-sizing.output.schema.json
+    dependencies: [hackathon-idea-scoring]
+    optional_dependencies: [startup-customer-evidence]
+    produces: [market-sizing]
+    consumes: [selected-idea]
+    supported_agents: [claude-code, codex, opencode]
+
+  startup-competitor-mapper:
+    version: "0.1.0"
+    phase: startup-validation
+    status: beta
+    description: "Map competitors, identify differentiation whitespace, and position the venture."
+    path: skills/startup-competitor-mapper
+    input_schema: schemas/skills/startup-competitor-mapper.input.schema.json
+    output_schema: schemas/skills/startup-competitor-mapper.output.schema.json
+    dependencies: [hackathon-idea-scoring]
+    optional_dependencies: []
+    produces: [competitor-map]
+    consumes: [selected-idea]
+    supported_agents: [claude-code, codex, opencode]
+
+  startup-business-model:
+    version: "0.1.0"
+    phase: startup-validation
+    status: beta
+    description: "Define the business model (value prop, revenue streams, cost structure, unit economics)."
+    path: skills/startup-business-model
+    input_schema: schemas/skills/startup-business-model.input.schema.json
+    output_schema: schemas/skills/startup-business-model.output.schema.json
+    dependencies: [hackathon-idea-scoring]
+    optional_dependencies: [startup-market-sizing, startup-pricing-hypothesis]
+    produces: [business-model]
+    consumes: [selected-idea, market-sizing]
+    supported_agents: [claude-code, codex, opencode]
+
+  startup-pricing-hypothesis:
+    version: "0.1.0"
+    phase: startup-validation
+    status: beta
+    description: "Form and test a concrete pricing hypothesis (model, price point, willingness to pay)."
+    path: skills/startup-pricing-hypothesis
+    input_schema: schemas/skills/startup-pricing-hypothesis.input.schema.json
+    output_schema: schemas/skills/startup-pricing-hypothesis.output.schema.json
+    dependencies: [hackathon-idea-scoring]
+    optional_dependencies: [startup-customer-evidence, startup-competitor-mapper]
+    produces: [pricing-hypothesis]
+    consumes: [selected-idea, customer-evidence]
+    supported_agents: [claude-code, codex, opencode]
+
+  startup-gtm-planner:
+    version: "0.1.0"
+    phase: startup-validation
+    status: beta
+    description: "Design a focused go-to-market plan (beachhead segment, channel, first-100-customers path)."
+    path: skills/startup-gtm-planner
+    input_schema: schemas/skills/startup-gtm-planner.input.schema.json
+    output_schema: schemas/skills/startup-gtm-planner.output.schema.json
+    dependencies: [hackathon-idea-scoring]
+    optional_dependencies: [startup-pricing-hypothesis]
+    produces: [gtm-plan]
+    consumes: [selected-idea, pricing-hypothesis]
+    supported_agents: [claude-code, codex, opencode]
+
+  startup-pilot-designer:
+    version: "0.1.0"
+    phase: startup-validation
+    status: beta
+    description: "Design a credible pilot / lighthouse-customer plan that generates traction evidence."
+    path: skills/startup-pilot-designer
+    input_schema: schemas/skills/startup-pilot-designer.input.schema.json
+    output_schema: schemas/skills/startup-pilot-designer.output.schema.json
+    dependencies: [startup-gtm-planner]
+    optional_dependencies: []
+    produces: [pilot-plan]
+    consumes: [gtm-plan, selected-idea]
+    supported_agents: [claude-code, codex, opencode]
+
+  startup-judge-simulator:
+    version: "0.1.0"
+    phase: startup-validation
+    status: beta
+    description: "Simulate investor-style judge Q&A and prepare defensible, evidence-backed answers."
+    path: skills/startup-judge-simulator
+    input_schema: schemas/skills/startup-judge-simulator.input.schema.json
+    output_schema: schemas/skills/startup-judge-simulator.output.schema.json
+    dependencies: [hackathon-idea-scoring]
+    optional_dependencies: [startup-business-model, startup-market-sizing, startup-customer-evidence]
+    produces: [investor-qa]
+    consumes: [selected-idea, business-model, competition]
+    supported_agents: [claude-code, codex, opencode]

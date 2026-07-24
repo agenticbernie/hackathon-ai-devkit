@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "composite": true
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../core" },
+    { "path": "../state-store" },
+    { "path": "../orchestrator" },
+    { "path": "../scaffold-engine" },
+    { "path": "../validators" },
+    { "path": "../hyperframes-adapter" },
+    { "path": "../agent-adapters" }
+  ]
+}
