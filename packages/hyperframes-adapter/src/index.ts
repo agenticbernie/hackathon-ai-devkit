@@ -219,7 +219,7 @@ export class HyperFramesAdapter {
           scripts: {
             preview: 'echo "Open compositions/submission-video.html in a browser to preview"',
             lint: 'node scripts/lint-composition.mjs',
-            render: 'node scripts/render.ts',
+            render: 'node scripts/render.mjs',
           },
         },
         null,
@@ -231,11 +231,11 @@ export class HyperFramesAdapter {
 
     // Scripts
     writeFileSync(
-      join(dir, 'scripts', 'render.ts'),
+      join(dir, 'scripts', 'render.mjs'),
       this.renderScript(),
       'utf-8',
     );
-    filesWritten.push('scripts/render.ts');
+    filesWritten.push('scripts/render.mjs');
 
     writeFileSync(
       join(dir, 'scripts', 'lint-composition.mjs'),
@@ -265,7 +265,8 @@ export class HyperFramesAdapter {
     // Update state
     this.store.update((s) => {
       s.delivery.video_status = 'project_generated';
-      if (s.delivery.phase === 'video') s.delivery.phase = 'judge';
+      // Stay in the video phase until a successful render passes video_gate;
+      // `hadk video render` advances to judge once the MP4 is verified.
     });
     this.store.log('video', `Generated HyperFrames video project at ${dir}.`);
 
@@ -424,33 +425,52 @@ ${sceneBlocks}
     return `/**
  * Render the HyperFrames composition to MP4.
  *
- * Requires the HeyGen HyperFrames CLI. If unavailable, this script
- * reports the blocker honestly instead of claiming success.
+ * Requires the HeyGen HyperFrames CLI (binary: hyperframes or hf). If
+ * unavailable, this script reports the blocker honestly instead of claiming
+ * success.
  */
 
-const { execSync } = require('node:child_process');
+import { execFileSync } from 'node:child_process';
+import { existsSync, statSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
-function detectHyperFrames(): boolean {
-  try {
-    execSync('hyperframes --version', { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
+function detectHyperFrames(): string | null {
+  for (const bin of ['hyperframes', 'hf']) {
+    try {
+      execFileSync(bin, ['--version'], { stdio: 'ignore' });
+      return bin;
+    } catch {
+      // try next alias
+    }
   }
+  return null;
 }
 
-if (!detectHyperFrames()) {
-  console.error('BLOCKED: HyperFrames CLI not found.');
+const bin = detectHyperFrames();
+if (!bin) {
+  console.error('BLOCKED: HyperFrames CLI not found (tried hyperframes, hf).');
   console.error('The composition at compositions/submission-video.html is valid and previewable.');
   console.error('Install the HyperFrames toolchain, then re-run: pnpm render');
   process.exit(2);
 }
 
-console.log('Rendering composition with HyperFrames...');
-execSync('hyperframes render compositions/submission-video.html --output output/submission-video.mp4', {
+const outputDir = join(process.cwd(), 'output');
+if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true });
+
+const outputPath = join(outputDir, 'submission-video.mp4');
+
+console.log('Rendering composition with HyperFrames (' + bin + ')...');
+execFileSync(bin, ['render', 'compositions/submission-video.html', '--output', outputPath], {
   stdio: 'inherit',
 });
-console.log('Render complete: output/submission-video.mp4');
+
+if (!existsSync(outputPath)) {
+  console.error('FAIL: render did not produce ' + outputPath);
+  process.exit(3);
+}
+
+const size = statSync(outputPath).size;
+console.log('Render complete: ' + outputPath + ' (' + (size / 1024).toFixed(1) + ' KB)');
 `;
   }
 
@@ -581,13 +601,16 @@ The composition remains valid and previewable; MP4 output requires the toolchain
   }
 
   private detectHyperFrames(): boolean {
-    try {
-      // Use execFileSync with an argv array (no shell interpolation).
-      execFileSync('hyperframes', ['--version'], { stdio: 'ignore' });
-      return true;
-    } catch {
-      return false;
+    for (const bin of ['hyperframes', 'hf']) {
+      try {
+        // Use execFileSync with an argv array (no shell interpolation).
+        execFileSync(bin, ['--version'], { stdio: 'ignore' });
+        return true;
+      } catch {
+        // try next alias
+      }
     }
+    return false;
   }
 }
 

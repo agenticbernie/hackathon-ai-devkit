@@ -11,8 +11,8 @@ guarantees it provides.
 
 ## What the installer does
 
-1. Detects the OS, shell, Node.js (requires ≥ 20), a package manager
-   (pnpm → npm fallback), git, and installed agents.
+1. Detects the OS, shell, Node.js (requires ≥ 20), pnpm (bootstraps via Corepack
+   if missing), git, and installed agents.
 2. Obtains the source: from a local checkout (if `manifest.yaml` + `packages/`
    are present) or by `git clone`.
 3. Installs it to `HADK_INSTALL_DIR` (default `~/.hadk`).

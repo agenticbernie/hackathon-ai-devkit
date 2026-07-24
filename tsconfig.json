@@ -9,6 +9,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@hadk/*": ["packages/*/src/index.ts"]
+    },
     "noEmit": true
   },
   "references": [

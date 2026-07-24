@@ -8,7 +8,7 @@ export type CompetitionType = 'hackathon' | 'buildathon' | 'startup-contest';
 
 export type StrategyMode = 'conservative' | 'realistic' | 'futuristic';
 
-export type TasteSource = 'user' | 'auto';
+export type TasteSource = 'user' | 'auto' | 'auto_fallback';
 
 export type Phase =
   | 'setup'
@@ -81,6 +81,8 @@ export interface CompetitionState {
   architecture: {
     profile: string | null;
     status: 'unselected' | 'selected' | 'generated' | 'invalidated';
+    invalidation_reason?: string;
+    stale_since?: string;
     decisions: ArchitectureDecision[];
     feature_mapping: Record<string, FeatureMapping>;
   };

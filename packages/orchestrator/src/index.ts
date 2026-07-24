@@ -323,13 +323,16 @@ export class Orchestrator {
       if (s.scope.status === 'locked') {
         s.scope.status = 'unlocked';
       }
-      // Cascade invalidation: architecture and everything downstream
+      // Cascade invalidation: scope and everything downstream must be re-earned
+      s.gates.scope_gate = 'pending';
       s.gates.architecture_gate = 'pending';
       s.gates.build_gate = 'pending';
       s.gates.demo_gate = 'pending';
       s.gates.video_gate = 'pending';
       s.gates.submission_gate = 'pending';
       s.architecture.status = 'invalidated';
+      s.architecture.invalidation_reason = reason;
+      s.architecture.stale_since = new Date().toISOString();
       // Roll back phase to scope so the user re-runs scope → architecture → scaffold
       s.delivery.phase = 'scope';
     });

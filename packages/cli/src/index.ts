@@ -13,12 +13,14 @@ import { runValidator, runAllValidators, type ValidatorName } from '@hadk/valida
 import { HyperFramesAdapter } from '@hadk/hyperframes-adapter';
 import { AgentAdapters } from '@hadk/agent-adapters';
 import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   cmdSetup,
   cmdIngest,
   cmdConfigure,
   cmdStrategy,
   cmdIdea,
+  cmdIdeaImport,
   cmdScope,
   cmdStatus,
   cmdNext,
@@ -80,23 +82,33 @@ program
   .description('Select strategy mode (conservative | realistic | futuristic) and taste profile')
   .option('--mode <mode>', 'conservative | realistic | futuristic', 'realistic')
   .option('--taste <taste>', 'auto (infer) | user (supply taste)', 'auto')
-  .option('--market <markets>', 'comma-separated: b2b,b2c,enterprise,developer,consumer')
-  .option('--layer <layers>', 'comma-separated: infrastructure,tooling,application,data')
-  .option('--technology <techs>', 'comma-separated: ai_agents,blockchain,web3,data,climate')
-  .option('--business-shape <shapes>', 'comma-separated: vertical_saas,platform,open_source')
-  .option('--traits <traits>', 'comma-separated: technically_impressive,commercially_credible,futuristic')
+  .option('--market <markets>', 'comma-separated: b2b,b2c,b2g,developer_tools')
+  .option('--layer <layers>', 'comma-separated: application,tooling,infrastructure,protocol,platform')
+  .option('--technology <techs>', 'comma-separated: ai_agents,blockchain,climate,robotics,cybersecurity,data,fintech,healthcare,education,iot')
+  .option('--business-shape <shapes>', 'comma-separated: vertical_saas,horizontal_platform,open_source,enterprise,marketplace')
+  .option('--traits <traits>', 'comma-separated: technically_impressive,commercially_credible,visually_demoable,socially_impactful,futuristic')
   .option('--taste-file <path>', 'read taste profile from a YAML file')
   .action(async (opts) => cmdStrategy(store(), opts));
 
 // ─── idea ────────────────────────────────────────────────────────────────────
-program
+const idea = program
   .command('idea')
-  .description('Generate, score, and select candidate ideas')
+  .description('Generate, score, select, and import candidate ideas');
+
+idea
+  .command('generate', { isDefault: true })
+  .description('Generate and score candidate ideas (default)')
   .option('--count <n>', 'number of candidate ideas (3-7)', '5')
-  .option('--agent <agent>', 'coding agent to drive research (claude-code, codex, opencode)')
-  .option('--provider <provider>', 'LLM provider (openai, openrouter, groq)')
-  .option('--research', 'run external research before generating ideas')
+  .option('--agent <agent>', 'intended coding agent for later refinement (claude-code, codex, opencode)')
+  .option('--provider <provider>', 'intended LLM provider for later refinement (openai, openrouter, groq)')
+  .option('--agent-handoff', 'export a prompt pack for an agent to refine ideas instead of generating heuristics')
   .action(async (opts) => cmdIdea(store(), opts));
+
+idea
+  .command('import')
+  .description('Import agent-refined idea candidates from a YAML file')
+  .argument('<file>', 'path to the YAML result file')
+  .action(async (file) => cmdIdeaImport(store(), file));
 
 // ─── scope ───────────────────────────────────────────────────────────────────
 program
@@ -253,7 +265,7 @@ video
     if (!validation.value.passed) return fail(`Video project invalid: ${validation.value.issues.join('; ')}`);
 
     const { execSync } = await import('node:child_process');
-    const { existsSync } = await import('node:fs');
+    const { existsSync, statSync } = await import('node:fs');
     const st = store();
     const videoDir = join(st.artifactsDir, 'video', 'demo-video');
 
@@ -267,11 +279,25 @@ video
       try {
         info('Rendering video…');
         execSync('pnpm render', { cwd: videoDir, encoding: 'utf-8', stdio: 'pipe', timeout: 300_000 });
-        // Verify MP4 was produced
+        // Verify MP4 was produced (portable Node stat, not GNU stat)
         const mp4 = join(videoDir, 'output', 'submission-video.mp4');
         if (existsSync(mp4)) {
-          const stats = execSync(`stat --printf="%s" "${mp4}"`, { encoding: 'utf-8' });
-          success(`MP4 rendered: ${mp4} (${(parseInt(stats, 10) / 1024).toFixed(1)} KB)`);
+          const size = statSync(mp4).size;
+          success(`MP4 rendered: ${mp4} (${(size / 1024).toFixed(1)} KB)`);
+          // Update state to reflect successful render
+          st.update((s) => {
+            s.delivery.video_status = 'rendered';
+            s.gates.video_gate = 'passed';
+            if (s.delivery.phase === 'video' || s.delivery.phase === 'judge') {
+              s.delivery.phase = 'judge';
+            }
+          });
+          st.writeArtifact('video', 'render-report.yaml', {
+            rendered_at: new Date().toISOString(),
+            output_path: mp4,
+            size_bytes: size,
+            video_gate: 'passed',
+          });
         } else {
           warn('Render completed but no MP4 found. Check demo-video/output/.');
         }
@@ -280,7 +306,7 @@ video
         info('The composition remains valid and previewable: open demo-video/compositions/submission-video.html');
       }
     } else {
-      warn('HyperFrames CLI not found. Install it to render the composition to MP4.');
+      warn('HyperFrames CLI not found (tried hyperframes, hf). Install it to render the composition to MP4.');
       info('Manually: cd demo-video && pnpm render');
       info('The composition remains valid and previewable: open demo-video/compositions/submission-video.html');
     }
@@ -360,7 +386,29 @@ function printValidationResults(results: import('@hadk/core').ValidationResult[]
   }
 }
 
-program.parseAsync(process.argv).catch((e) => {
-  fail(e instanceof Error ? e.message : String(e));
-  process.exit(1);
-});
+export {
+  cmdSetup,
+  cmdIngest,
+  cmdConfigure,
+  cmdStrategy,
+  cmdIdea,
+  cmdIdeaImport,
+  cmdScope,
+  cmdStatus,
+  cmdNext,
+  cmdCheckpoint,
+  cmdRollback,
+  cmdReplan,
+  cmdDemo,
+  cmdJudge,
+  cmdSubmit,
+  cmdDoctor,
+  cmdUpdate,
+} from './handlers.js';
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  program.parseAsync(process.argv).catch((e) => {
+    fail(e instanceof Error ? e.message : String(e));
+    process.exit(1);
+  });
+}

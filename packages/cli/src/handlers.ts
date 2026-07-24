@@ -157,6 +157,17 @@ export async function cmdConfigure(
 
 // ─── strategy ────────────────────────────────────────────────────────────────
 
+function validateTasteValues(taste: CompetitionState['strategy']['idea_taste']): void {
+  (Object.keys(TASTE_OPTIONS) as (keyof typeof TASTE_OPTIONS)[]).forEach((key) => {
+    const allowed = new Set(TASTE_OPTIONS[key] as readonly string[]);
+    const values = taste[key] ?? [];
+    const unknown = values.filter((v) => !allowed.has(v));
+    if (unknown.length > 0) {
+      warn(`Unknown ${key} values: ${unknown.join(', ')}. Allowed: ${[...allowed].join(', ')}. Custom values are accepted but may not match built-in profiles.`);
+    }
+  });
+}
+
 export async function cmdStrategy(
   store: StateStore,
   opts: {
@@ -177,7 +188,7 @@ export async function cmdStrategy(
     return fail(`Invalid mode "${mode}". Choose: ${STRATEGY_MODES.join(', ')}`);
   }
 
-  const tasteSource = opts.taste === 'user' ? 'user' : 'auto';
+  let tasteSource: 'auto' | 'user' | 'auto_fallback' = opts.taste === 'user' ? 'user' : 'auto';
   const weights = SCORING_WEIGHTS[mode];
   const loaded = store.load();
   if (!loaded.ok) return fail(loaded.error.message);
@@ -192,6 +203,7 @@ export async function cmdStrategy(
       const tasteResult = readYamlFile<CompetitionState['strategy']['idea_taste']>(opts.tasteFile);
       if (!tasteResult.ok) return fail(`Could not read taste file: ${tasteResult.error.message}`);
       taste = tasteResult.value;
+      validateTasteValues(taste);
     } else {
       taste = {
         market: opts.market ? opts.market.split(',').map((x) => x.trim()).filter(Boolean) : [],
@@ -200,11 +212,13 @@ export async function cmdStrategy(
         business_shape: opts.businessShape ? opts.businessShape.split(',').map((x) => x.trim()).filter(Boolean) : [],
         desired_traits: opts.traits ? opts.traits.split(',').map((x) => x.trim()).filter(Boolean) : [],
       };
+      validateTasteValues(taste);
       // If no flags were provided at all, warn and fall back to auto
       const allEmpty = Object.values(taste).every((a) => a.length === 0);
       if (allEmpty) {
         warn('No taste flags provided. Use --market/--technology/--traits/--taste-file to declare your taste, or switch to --taste auto.');
         info('Falling back to auto-inferred taste.');
+        tasteSource = 'auto_fallback';
         taste = inferTaste(loaded.value);
       }
     }
@@ -219,7 +233,7 @@ export async function cmdStrategy(
       s.strategy.selected_track = s.competition.tracks[0].name;
     }
     if (s.delivery.phase === 'strategy') {
-      s.gates.idea_gate = s.gates.idea_gate; // unchanged; idea gate set by `hadk idea`
+      // idea_gate is intentionally left unchanged; it is set by `hadk idea`.
       s.delivery.phase = 'idea';
     }
   });
@@ -235,7 +249,9 @@ export async function cmdStrategy(
     rationale:
       tasteSource === 'auto'
         ? 'Taste profile inferred from competition rubric, team skills, duration, and differentiation whitespace to maximize winning probability.'
-        : 'Taste profile provided by user.',
+        : tasteSource === 'auto_fallback'
+          ? 'User requested user taste but provided no values; fell back to auto-inferred profile.'
+          : 'Taste profile provided by user.',
   };
   store.writeArtifact('strategy', 'strategy.yaml', artifact);
 
@@ -247,7 +263,56 @@ export async function cmdStrategy(
 
 // ─── idea ────────────────────────────────────────────────────────────────────
 
-export async function cmdIdea(store: StateStore, opts: { count?: string; agent?: string; provider?: string; research?: boolean }): Promise<void> {
+function buildAgentIdeaPrompt(state: CompetitionState, agent?: string, provider?: string): string {
+  const lines = [
+    '# HADK Agent Handoff: Idea Research & Selection',
+    '',
+    `You are helping a team competing in **${state.competition.name}**.`,
+    `Competition type: ${state.competition.type ?? 'hackathon'}`,
+    `Deadline: ${state.competition.deadline ?? 'TBD'}`,
+    `Remaining hours: ${state.competition.remaining_hours ?? 'TBD'}`,
+    '',
+    '## Tracks',
+    ...(state.competition.tracks.length ? state.competition.tracks.map((t) => `- ${t.name}: ${t.description || 'No description'}`) : ['- No track data available.']),
+    '',
+    '## Judging Criteria',
+    ...(state.competition.judging_criteria.length ? state.competition.judging_criteria.map((c) => `- ${c.name} (${c.weight}x): ${c.description || ''}`) : ['- No criteria available.']),
+    '',
+    '## Team',
+    `- Size: ${state.team.size}`,
+    `- Skills: ${state.team.skills.join(', ') || 'generalist'}`,
+    `- Members: ${state.team.members.join(', ') || 'unspecified'}`,
+    '',
+    '## Strategy Mode',
+    `- Mode: ${state.strategy.mode}`,
+    `- Taste source: ${state.strategy.taste_source}`,
+    `- Taste profile:`,
+    `  - market: ${state.strategy.idea_taste.market.join(', ') || 'any'}`,
+    `  - product_layer: ${state.strategy.idea_taste.product_layer.join(', ') || 'any'}`,
+    `  - technology: ${state.strategy.idea_taste.technology.join(', ') || 'any'}`,
+    `  - business_shape: ${state.strategy.idea_taste.business_shape.join(', ') || 'any'}`,
+    `  - desired_traits: ${state.strategy.idea_taste.desired_traits.join(', ') || 'balanced'}`,
+    '',
+    '## Your Task',
+    '1. Compare tracks and expected win probability for this team.',
+    '2. Collect evidence: market/problem fit, previous winners, idea saturation.',
+    '3. Generate 5 distinct candidate ideas aligned with the strategy mode and taste.',
+    '4. Run adversarial critique on each candidate.',
+    '5. Score each candidate across: differentiation, feasibility, wow, rubric fit, team fit, fallback safety.',
+    '6. Recommend a winning idea and 2 runner-ups.',
+    '',
+    '## Output Format',
+    'Write your result as a YAML file matching `.hackathon/artifacts/ideas/result.yaml` with the same schema used by `hadk idea`.',
+    '',
+    `Intended agent: ${agent ?? 'unspecified'}`,
+    `Intended provider: ${provider ?? 'unspecified'}`,
+    '',
+    'After generating the result, the user will run: `hadk idea import .hackathon/artifacts/ideas/result.yaml`',
+  ];
+  return lines.join('\n');
+}
+
+export async function cmdIdea(store: StateStore, opts: { count?: string; agent?: string; provider?: string; agentHandoff?: boolean }): Promise<void> {
   ensureInitialized(store);
   const loaded = store.load();
   if (!loaded.ok) return fail(loaded.error.message);
@@ -257,18 +322,31 @@ export async function cmdIdea(store: StateStore, opts: { count?: string; agent?:
     return fail('No strategy selected.', 'Run `hadk strategy` first.');
   }
 
+  // Agent handoff: export a prompt pack and stop; do not claim agent-guided generation.
+  if (opts.agentHandoff) {
+    const prompt = buildAgentIdeaPrompt(state, opts.agent, opts.provider);
+    const promptResult = store.writeArtifact('generated', 'idea-agent-prompt.md', prompt);
+    if (!promptResult.ok) return fail(promptResult.error.message);
+    success('Agent handoff prompt exported.');
+    info(`Prompt: ${promptResult.value}`);
+    info('Load this prompt into your agent, then import the result with `hadk idea import <result.yaml>` when ready.');
+    return;
+  }
+
   const count = Math.min(7, Math.max(3, parseInt(opts.count ?? '5', 10)));
   const candidates = generateCandidateIdeas(state, count);
 
-  // Determine generation mode for provenance tracking
-  const hasAgent = !!(opts.agent || opts.provider);
-  const generationMode = hasAgent ? 'agent_guided' : 'heuristic_fallback';
-  const confidence: 'low' | 'medium' | 'high' = hasAgent ? 'medium' : 'low';
+  // Determine generation mode for provenance tracking.
+  // --agent/--provider without --agent-handoff are declarations of intent only,
+  // not actual agent execution. Report them honestly so we do not over-claim.
+  const hasDeclaredIntent = !!(opts.agent || opts.provider);
+  const generationMode = hasDeclaredIntent ? 'declared_intent' : 'heuristic_fallback';
+  const confidence: 'low' | 'medium' | 'high' = hasDeclaredIntent ? 'low' : 'low';
 
   if (generationMode === 'heuristic_fallback') {
-    info('Running in heuristic mode — ideas are deterministic skeletons. Use --agent and --provider for richer research-backed ideas.');
+    info('Running in heuristic mode — ideas are deterministic skeletons. Use --agent-handoff for agent-driven idea research.');
   } else {
-    info(`Agent-requested generation via ${opts.agent ?? opts.provider}. Full agent execution is a v2.2 feature; using heuristic generation with agent-refinement path.`);
+    info(`Declared intent: refine ideas via ${opts.agent ?? opts.provider}. No agent executed. Use --agent-handoff to generate a prompt pack.`);
   }
 
   // Score each candidate
@@ -328,6 +406,56 @@ export async function cmdIdea(store: StateStore, opts: { count?: string; agent?:
   info('Next: hadk scope');
 }
 
+export async function cmdIdeaImport(store: StateStore, filePath: string): Promise<void> {
+  ensureInitialized(store);
+  const loaded = store.load();
+  if (!loaded.ok) return fail(loaded.error.message);
+  const state = loaded.value;
+
+  const result = readYamlFile<{ candidates: CandidateIdea[]; selected: SelectedIdea }>(filePath);
+  if (!result.ok) return fail(`Could not read idea result file: ${result.error.message}`);
+  const { candidates, selected } = result.value;
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return fail('Imported file must contain a non-empty `candidates` array.');
+  }
+  if (!selected?.name) {
+    return fail('Imported file must contain a `selected` object with a `name`.');
+  }
+
+  // Persist with honest provenance: imported from agent
+  const candWrite = store.writeArtifact('ideas', 'candidates.yaml', {
+    schema_version: '1.0',
+    generated_at: nowIso(),
+    imported_at: nowIso(),
+    strategy_mode: state.strategy.mode,
+    generation_mode: 'agent_imported',
+    confidence: 'medium',
+    source_file: filePath,
+    candidates,
+  });
+  if (!candWrite.ok) return fail(candWrite.error.message);
+
+  const selWrite = store.writeArtifact('ideas', 'selected.yaml', {
+    schema_version: '1.0',
+    selected_at: nowIso(),
+    imported_at: nowIso(),
+    selected_idea: selected,
+    alternatives: candidates
+      .filter((c) => c.name !== selected.name)
+      .map((c) => ({ id: c.id, name: c.name, total_score: c.total_score })),
+  });
+  if (!selWrite.ok) return fail(selWrite.error.message);
+
+  store.update((s) => {
+    s.strategy.selected_idea = selected.name;
+    s.gates.idea_gate = 'passed';
+    if (s.delivery.phase === 'idea') s.delivery.phase = 'scope';
+  });
+
+  success(`Imported ${candidates.length} candidates; selected "${selected.name}".`);
+  info('Next: hadk scope');
+}
+
 // ─── scope ───────────────────────────────────────────────────────────────────
 
 export async function cmdScope(store: StateStore, opts: { unlock?: boolean }): Promise<void> {
@@ -338,21 +466,27 @@ export async function cmdScope(store: StateStore, opts: { unlock?: boolean }): P
 
   if (opts.unlock) {
     // Create a checkpoint before unlocking so the user can roll back
-    store.createCheckpoint('pre-unlock');
+    const checkpoint = store.createCheckpoint('pre-unlock');
+    if (!checkpoint.ok) {
+      return fail(`Could not create checkpoint before unlocking scope: ${checkpoint.error.message}`);
+    }
     store.update((s) => {
       s.scope.status = 'unlocked';
-      // Cascade invalidation: architecture and downstream gates must be re-earned
+      // Cascade invalidation: scope and downstream gates must be re-earned
+      s.gates.scope_gate = 'pending';
       s.gates.architecture_gate = 'pending';
       s.gates.build_gate = 'pending';
       s.gates.demo_gate = 'pending';
       s.gates.video_gate = 'pending';
       s.gates.submission_gate = 'pending';
       s.architecture.status = 'invalidated';
+      s.architecture.invalidation_reason = 'scope unlocked by user';
+      s.architecture.stale_since = new Date().toISOString();
       if (s.delivery.phase !== 'scope' && s.delivery.phase !== 'setup' && s.delivery.phase !== 'competition-intelligence' && s.delivery.phase !== 'strategy' && s.delivery.phase !== 'idea') {
         s.delivery.phase = 'scope';
       }
     });
-    success('Scope unlocked. Downstream gates reset (architecture → submission). A checkpoint was created.');
+    success('Scope unlocked. Downstream gates reset (scope → submission). A checkpoint was created.');
     info('Re-lock after changes: hadk scope');
     info('Roll back if needed: hadk rollback');
     return;

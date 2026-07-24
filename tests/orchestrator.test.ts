@@ -1,8 +1,24 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Orchestrator, scoreIdea, validateScoringProfile } from '@hadk/orchestrator';
-import { createDefaultState } from '@hadk/state-store';
+import { StateStore, createDefaultState } from '@hadk/state-store';
 import { SCORING_WEIGHTS, STRATEGY_MODES } from '@hadk/core';
 import type { CompetitionState } from '@hadk/core';
+
+let dir: string;
+let store: StateStore;
+
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), 'hadk-orch-'));
+  store = new StateStore(dir);
+  store.init();
+});
+
+afterEach(() => {
+  rmSync(dir, { recursive: true, force: true });
+});
 
 function stateWith(remaining: number | null): CompetitionState {
   const s = createDefaultState();
@@ -50,7 +66,10 @@ describe('strategy scoring', () => {
 });
 
 describe('deadline mode transitions', () => {
-  const orch = new Orchestrator();
+  let orch: Orchestrator;
+  beforeEach(() => {
+    orch = new Orchestrator(store);
+  });
 
   it('selects "full" mode with plenty of time', () => {
     expect(orch.getDeadlineMode(stateWith(48))).toBe('full');
@@ -78,7 +97,10 @@ describe('deadline mode transitions', () => {
 });
 
 describe('orchestrator status and next action', () => {
-  const orch = new Orchestrator();
+  let orch: Orchestrator;
+  beforeEach(() => {
+    orch = new Orchestrator(store);
+  });
 
   it('produces a status report for fresh state', () => {
     const s = createDefaultState();
