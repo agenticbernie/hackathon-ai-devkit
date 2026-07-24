@@ -355,12 +355,13 @@ export async function execute${comp}(data: unknown) {
     }
 
     for (const test of mapping.tests) {
-      files.push(mkFile(test, `import { describe, it, expect } from 'vitest';
+      files.push(mkFile(test, `import { describe, it } from 'vitest';
 
 describe('${featureId}', () => {
-  it('placeholder — implement after contract wiring', () => {
-    expect(true).toBe(true);
-  });
+  it.todo('implements the feature contract');
+  it.todo('returns correct event on success');
+  it.todo('reverts with correct error on invalid input');
+  it.todo('fallback for local anvil chain');
 });
 `));
     }

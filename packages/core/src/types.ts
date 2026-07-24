@@ -80,7 +80,7 @@ export interface CompetitionState {
 
   architecture: {
     profile: string | null;
-    status: 'unselected' | 'selected' | 'generated';
+    status: 'unselected' | 'selected' | 'generated' | 'invalidated';
     decisions: ArchitectureDecision[];
     feature_mapping: Record<string, FeatureMapping>;
   };

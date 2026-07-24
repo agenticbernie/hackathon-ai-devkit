@@ -12,7 +12,7 @@ import { ScaffoldEngine, listProfiles } from '@hadk/scaffold-engine';
 import { runValidator, runAllValidators, type ValidatorName } from '@hadk/validators';
 import { HyperFramesAdapter } from '@hadk/hyperframes-adapter';
 import { AgentAdapters } from '@hadk/agent-adapters';
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
 import {
   cmdSetup,
   cmdIngest,
@@ -79,7 +79,13 @@ program
   .command('strategy')
   .description('Select strategy mode (conservative | realistic | futuristic) and taste profile')
   .option('--mode <mode>', 'conservative | realistic | futuristic', 'realistic')
-  .option('--taste <taste>', 'user | auto', 'auto')
+  .option('--taste <taste>', 'auto (infer) | user (supply taste)', 'auto')
+  .option('--market <markets>', 'comma-separated: b2b,b2c,enterprise,developer,consumer')
+  .option('--layer <layers>', 'comma-separated: infrastructure,tooling,application,data')
+  .option('--technology <techs>', 'comma-separated: ai_agents,blockchain,web3,data,climate')
+  .option('--business-shape <shapes>', 'comma-separated: vertical_saas,platform,open_source')
+  .option('--traits <traits>', 'comma-separated: technically_impressive,commercially_credible,futuristic')
+  .option('--taste-file <path>', 'read taste profile from a YAML file')
   .action(async (opts) => cmdStrategy(store(), opts));
 
 // ─── idea ────────────────────────────────────────────────────────────────────
@@ -87,6 +93,9 @@ program
   .command('idea')
   .description('Generate, score, and select candidate ideas')
   .option('--count <n>', 'number of candidate ideas (3-7)', '5')
+  .option('--agent <agent>', 'coding agent to drive research (claude-code, codex, opencode)')
+  .option('--provider <provider>', 'LLM provider (openai, openrouter, groq)')
+  .option('--research', 'run external research before generating ideas')
   .action(async (opts) => cmdIdea(store(), opts));
 
 // ─── scope ───────────────────────────────────────────────────────────────────
@@ -242,8 +251,39 @@ video
     const validation = adapter.validate();
     if (!validation.ok) return fail(validation.error.message);
     if (!validation.value.passed) return fail(`Video project invalid: ${validation.value.issues.join('; ')}`);
-    warn('Rendering requires the HyperFrames CLI. Run: cd demo-video && pnpm render');
-    info('If the CLI is unavailable, the composition remains valid and previewable.');
+
+    const { execSync } = await import('node:child_process');
+    const { existsSync } = await import('node:fs');
+    const st = store();
+    const videoDir = join(st.artifactsDir, 'video', 'demo-video');
+
+    // Try to find HyperFrames CLI
+    let hfBin = '';
+    try { hfBin = execSync('which hyperframes 2>/dev/null || true', { encoding: 'utf-8' }).trim(); } catch { /* ignore */ }
+    if (!hfBin) { try { hfBin = execSync('which hf 2>/dev/null || true', { encoding: 'utf-8' }).trim(); } catch { /* ignore */ } }
+
+    if (hfBin && existsSync(join(videoDir, 'package.json'))) {
+      info(`HyperFrames CLI found: ${hfBin}`);
+      try {
+        info('Rendering video…');
+        execSync('pnpm render', { cwd: videoDir, encoding: 'utf-8', stdio: 'pipe', timeout: 300_000 });
+        // Verify MP4 was produced
+        const mp4 = join(videoDir, 'output', 'submission-video.mp4');
+        if (existsSync(mp4)) {
+          const stats = execSync(`stat --printf="%s" "${mp4}"`, { encoding: 'utf-8' });
+          success(`MP4 rendered: ${mp4} (${(parseInt(stats, 10) / 1024).toFixed(1)} KB)`);
+        } else {
+          warn('Render completed but no MP4 found. Check demo-video/output/.');
+        }
+      } catch (e: any) {
+        warn(`Render failed (HyperFrames CLI may need setup): ${e.stderr ?? e.message}`);
+        info('The composition remains valid and previewable: open demo-video/compositions/submission-video.html');
+      }
+    } else {
+      warn('HyperFrames CLI not found. Install it to render the composition to MP4.');
+      info('Manually: cd demo-video && pnpm render');
+      info('The composition remains valid and previewable: open demo-video/compositions/submission-video.html');
+    }
   });
 
 video

@@ -175,6 +175,7 @@ export class ScaffoldEngine {
         s.architecture.profile = plan.profile;
         s.architecture.status = 'generated';
         s.architecture.feature_mapping = plan.feature_mapping;
+        s.gates.architecture_gate = 'passed';
         if (s.delivery.phase === 'scaffold' || s.delivery.phase === 'architecture') {
           s.delivery.phase = 'build';
         }

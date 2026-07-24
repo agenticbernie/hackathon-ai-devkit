@@ -319,14 +319,23 @@ export class Orchestrator {
         mitigation: 'Scope and timeline re-evaluated.',
         status: 'open',
       });
-      // Unlock scope for re-evaluation
+      // Unlock scope
       if (s.scope.status === 'locked') {
         s.scope.status = 'unlocked';
       }
+      // Cascade invalidation: architecture and everything downstream
+      s.gates.architecture_gate = 'pending';
+      s.gates.build_gate = 'pending';
+      s.gates.demo_gate = 'pending';
+      s.gates.video_gate = 'pending';
+      s.gates.submission_gate = 'pending';
+      s.architecture.status = 'invalidated';
+      // Roll back phase to scope so the user re-runs scope → architecture → scaffold
+      s.delivery.phase = 'scope';
     });
 
     if (!updated.ok) return updated;
-    this.store.log('replan', `Replan triggered: ${reason}`);
+    this.store.log('replan', `Replan triggered: ${reason}. Gates reset: architecture → submission; scope unlocked.`);
     return updated;
   }
 }

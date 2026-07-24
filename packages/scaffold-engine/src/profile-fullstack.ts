@@ -298,14 +298,31 @@ export async function POST(request: NextRequest) {
     for (const route of mapping.routes) {
       files.push(mkFile(route, `import { NextRequest, NextResponse } from 'next/server';
 
-// Feature: ${featureId}
+/**
+ * Feature: ${featureId}
+ *
+ * Design contract:
+ * - GET returns current state for the feature
+ * - POST accepts input and delegates to the feature service
+ * - All endpoints return structured JSON with error handling
+ */
 export async function GET(request: NextRequest) {
-  return NextResponse.json({ feature: '${featureId}', status: 'scaffold-ready' });
+  // TODO: wire to feature service — return real state
+  return NextResponse.json({
+    feature: '${featureId}',
+    status: 'ok',
+    mode: process.env.NODE_ENV === 'production' ? 'live' : 'demo',
+  });
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => ({}));
-  return NextResponse.json({ feature: '${featureId}', received: body });
+  try {
+    const body = await request.json();
+    // TODO: delegate to feature service
+    return NextResponse.json({ feature: '${featureId}', received: body, result: 'not-implemented' });
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
 }
 `));
     }
@@ -348,13 +365,13 @@ export async function execute${comp}(input: ${comp}Input): Promise<${comp}Output
     }
 
     for (const test of mapping.tests) {
-      files.push(mkFile(test, `import { describe, it, expect } from 'vitest';
+      files.push(mkFile(test, `import { describe, it } from 'vitest';
 
 describe('${featureId}', () => {
-  it('service executes successfully', async () => {
-    // Import and test the feature service once implemented
-    expect(true).toBe(true);
-  });
+  it.todo('implements the feature contract');
+  it.todo('returns correct schema for valid input');
+  it.todo('returns 400 for missing required fields');
+  it.todo('fallback adapter produces deterministic output');
 });
 `));
     }

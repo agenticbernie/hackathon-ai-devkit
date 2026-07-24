@@ -82,19 +82,29 @@ if [ "$NODE_MAJOR" -lt 20 ]; then
 fi
 ok "Node.js v$NODE_VERSION"
 
-# ─── 4. Detect package manager ───────────────────────────────────────────────
+# ─── 4. Detect package manager (pnpm required) ───────────────────────────────
 PKG_MANAGER=""
-if command -v pnpm >/dev/null 2>&1; then PKG_MANAGER="pnpm"
-elif command -v npm >/dev/null 2>&1; then PKG_MANAGER="npm"
+if command -v pnpm >/dev/null 2>&1; then
+  PKG_MANAGER="pnpm"
 fi
 if [ -z "$PKG_MANAGER" ]; then
-  fail "No package manager found (need pnpm or npm)."
+  # Try Corepack (ships with Node.js >= 16)
+  if command -v corepack >/dev/null 2>&1; then
+    warn "pnpm not found — installing via Corepack."
+    corepack enable 2>/dev/null || true
+    corepack prepare pnpm@11.8.0 --activate 2>/dev/null || true
+    if command -v pnpm >/dev/null 2>&1; then
+      PKG_MANAGER="pnpm"
+    fi
+  fi
+fi
+if [ -z "$PKG_MANAGER" ]; then
+  fail "HADK requires pnpm (the monorepo uses pnpm workspaces)."
+  info "Install it: npm install -g pnpm"
+  info "Or enable Corepack (ships with Node.js >= 16): corepack enable && corepack prepare pnpm@11.8.0 --activate"
   exit 1
 fi
 ok "Package manager: $PKG_MANAGER"
-if [ "$PKG_MANAGER" = "npm" ]; then
-  warn "pnpm is recommended. The monorepo uses pnpm workspaces; npm will install but pnpm gives the cleanest build."
-fi
 
 # ─── 5. Detect git ───────────────────────────────────────────────────────────
 if command -v git >/dev/null 2>&1; then

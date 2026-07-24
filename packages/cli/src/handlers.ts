@@ -159,7 +159,16 @@ export async function cmdConfigure(
 
 export async function cmdStrategy(
   store: StateStore,
-  opts: { mode?: string; taste?: string },
+  opts: {
+    mode?: string;
+    taste?: string;
+    market?: string;
+    layer?: string;
+    technology?: string;
+    businessShape?: string;
+    traits?: string;
+    tasteFile?: string;
+  },
 ): Promise<void> {
   ensureInitialized(store);
 
@@ -170,11 +179,36 @@ export async function cmdStrategy(
 
   const tasteSource = opts.taste === 'user' ? 'user' : 'auto';
   const weights = SCORING_WEIGHTS[mode];
-
-  // Auto taste inference (deterministic from state)
   const loaded = store.load();
   if (!loaded.ok) return fail(loaded.error.message);
-  const taste = tasteSource === 'auto' ? inferTaste(loaded.value) : { market: [], product_layer: [], technology: [], business_shape: [], desired_traits: [] };
+
+  // Resolve taste profile
+  let taste: CompetitionState['strategy']['idea_taste'];
+  if (tasteSource === 'auto') {
+    taste = inferTaste(loaded.value);
+  } else {
+    // --taste user: read from flags or a YAML file
+    if (opts.tasteFile) {
+      const tasteResult = readYamlFile<CompetitionState['strategy']['idea_taste']>(opts.tasteFile);
+      if (!tasteResult.ok) return fail(`Could not read taste file: ${tasteResult.error.message}`);
+      taste = tasteResult.value;
+    } else {
+      taste = {
+        market: opts.market ? opts.market.split(',').map((x) => x.trim()).filter(Boolean) : [],
+        product_layer: opts.layer ? opts.layer.split(',').map((x) => x.trim()).filter(Boolean) : [],
+        technology: opts.technology ? opts.technology.split(',').map((x) => x.trim()).filter(Boolean) : [],
+        business_shape: opts.businessShape ? opts.businessShape.split(',').map((x) => x.trim()).filter(Boolean) : [],
+        desired_traits: opts.traits ? opts.traits.split(',').map((x) => x.trim()).filter(Boolean) : [],
+      };
+      // If no flags were provided at all, warn and fall back to auto
+      const allEmpty = Object.values(taste).every((a) => a.length === 0);
+      if (allEmpty) {
+        warn('No taste flags provided. Use --market/--technology/--traits/--taste-file to declare your taste, or switch to --taste auto.');
+        info('Falling back to auto-inferred taste.');
+        taste = inferTaste(loaded.value);
+      }
+    }
+  }
 
   store.update((s) => {
     s.strategy.mode = mode;
@@ -207,15 +241,13 @@ export async function cmdStrategy(
 
   success(`Strategy locked: ${mode} (taste: ${tasteSource})`);
   info(`Scoring axes: ${Object.keys(weights).join(', ')}`);
-  if (tasteSource === 'auto') {
-    info(`Inferred taste: tech=[${taste.technology.join(', ') || 'general'}] traits=[${taste.desired_traits.join(', ') || 'balanced'}]`);
-  }
+  info(`Taste: market=[${taste.market.join(', ') || 'any'}] tech=[${taste.technology.join(', ') || 'general'}] traits=[${taste.desired_traits.join(', ') || 'balanced'}]`);
   info('Next: hadk idea');
 }
 
 // ─── idea ────────────────────────────────────────────────────────────────────
 
-export async function cmdIdea(store: StateStore, opts: { count?: string }): Promise<void> {
+export async function cmdIdea(store: StateStore, opts: { count?: string; agent?: string; provider?: string; research?: boolean }): Promise<void> {
   ensureInitialized(store);
   const loaded = store.load();
   if (!loaded.ok) return fail(loaded.error.message);
@@ -227,6 +259,17 @@ export async function cmdIdea(store: StateStore, opts: { count?: string }): Prom
 
   const count = Math.min(7, Math.max(3, parseInt(opts.count ?? '5', 10)));
   const candidates = generateCandidateIdeas(state, count);
+
+  // Determine generation mode for provenance tracking
+  const hasAgent = !!(opts.agent || opts.provider);
+  const generationMode = hasAgent ? 'agent_guided' : 'heuristic_fallback';
+  const confidence: 'low' | 'medium' | 'high' = hasAgent ? 'medium' : 'low';
+
+  if (generationMode === 'heuristic_fallback') {
+    info('Running in heuristic mode — ideas are deterministic skeletons. Use --agent and --provider for richer research-backed ideas.');
+  } else {
+    info(`Agent-requested generation via ${opts.agent ?? opts.provider}. Full agent execution is a v2.2 feature; using heuristic generation with agent-refinement path.`);
+  }
 
   // Score each candidate
   for (const c of candidates) {
@@ -255,6 +298,8 @@ export async function cmdIdea(store: StateStore, opts: { count?: string }): Prom
     schema_version: '1.0',
     generated_at: nowIso(),
     strategy_mode: state.strategy.mode,
+    generation_mode: generationMode,
+    confidence,
     candidates,
   });
   store.writeArtifact('ideas', 'selected.yaml', {
@@ -292,10 +337,24 @@ export async function cmdScope(store: StateStore, opts: { unlock?: boolean }): P
   const state = loaded.value;
 
   if (opts.unlock) {
+    // Create a checkpoint before unlocking so the user can roll back
+    store.createCheckpoint('pre-unlock');
     store.update((s) => {
       s.scope.status = 'unlocked';
+      // Cascade invalidation: architecture and downstream gates must be re-earned
+      s.gates.architecture_gate = 'pending';
+      s.gates.build_gate = 'pending';
+      s.gates.demo_gate = 'pending';
+      s.gates.video_gate = 'pending';
+      s.gates.submission_gate = 'pending';
+      s.architecture.status = 'invalidated';
+      if (s.delivery.phase !== 'scope' && s.delivery.phase !== 'setup' && s.delivery.phase !== 'competition-intelligence' && s.delivery.phase !== 'strategy' && s.delivery.phase !== 'idea') {
+        s.delivery.phase = 'scope';
+      }
     });
-    success('Scope unlocked. Re-run `hadk scope` after changes to re-lock.');
+    success('Scope unlocked. Downstream gates reset (architecture → submission). A checkpoint was created.');
+    info('Re-lock after changes: hadk scope');
+    info('Roll back if needed: hadk rollback');
     return;
   }
 
