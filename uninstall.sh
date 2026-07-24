@@ -20,7 +20,7 @@ HADK_NON_INTERACTIVE="${HADK_NON_INTERACTIVE:-0}"
 HADK_PURGE="${HADK_PURGE:-0}"
 LAUNCHER="$HADK_BIN_DIR/hadk"
 
-if [ -t 1 ]; then G=$'\033[32m'; Y=$'\033[33m'; R=$'\033[31m'; D=$'\033[2m'; X=$'\033[0m'; else G=""; Y=""; R=""; D=""; X=""; fi
+if [ -t 1 ]; then G=$'\033[32m'; Y=$'\033[33m'; D=$'\033[2m'; X=$'\033[0m'; else G=""; Y=""; D=""; X=""; fi
 info(){ printf '%s\n' "${D}→${X} $*"; }
 ok(){ printf '%s\n' "${G}✓${X} $*"; }
 warn(){ printf '%s\n' "${Y}⚠${X} $*"; }

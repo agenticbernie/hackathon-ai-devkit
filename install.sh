@@ -200,7 +200,7 @@ case ":$PATH:" in
   *)
     warn "$HADK_BIN_DIR is not on your PATH."
     info "Add it to your shell profile:"
-    printf '    export PATH="%s:$PATH"\n' "$HADK_BIN_DIR"
+    printf "    export PATH=\"%s:\$PATH\"\n" "$HADK_BIN_DIR"
     ;;
 esac
 
