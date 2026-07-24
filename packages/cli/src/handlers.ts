@@ -302,7 +302,7 @@ function buildAgentIdeaPrompt(state: CompetitionState, agent?: string, provider?
     '6. Recommend a winning idea and 2 runner-ups.',
     '',
     '## Output Format',
-    'Write your result as a YAML file matching `.hackathon/artifacts/ideas/result.yaml` with the same schema used by `hadk idea`.',
+    'Write your result as YAML matching `schemas/idea-import.schema.json` and save it as `.hackathon/artifacts/ideas/result.yaml`.',
     '',
     `Intended agent: ${agent ?? 'unspecified'}`,
     `Intended provider: ${provider ?? 'unspecified'}`,
@@ -412,14 +412,62 @@ export async function cmdIdeaImport(store: StateStore, filePath: string): Promis
   if (!loaded.ok) return fail(loaded.error.message);
   const state = loaded.value;
 
-  const result = readYamlFile<{ candidates: CandidateIdea[]; selected: SelectedIdea }>(filePath);
+  const result = readYamlFile<{ schema_version?: string; candidates: CandidateIdea[]; selected: SelectedIdea }>(filePath);
   if (!result.ok) return fail(`Could not read idea result file: ${result.error.message}`);
-  const { candidates, selected } = result.value;
+  const { schema_version: schemaVersion, candidates, selected } = result.value;
+  if (schemaVersion !== '1.0') {
+    return fail('Imported file must declare `schema_version: "1.0"` (see schemas/idea-import.schema.json).');
+  }
   if (!Array.isArray(candidates) || candidates.length === 0) {
     return fail('Imported file must contain a non-empty `candidates` array.');
   }
   if (!selected?.name) {
     return fail('Imported file must contain a `selected` object with a `name`.');
+  }
+
+  const requiredCandidateFields = [
+    'id', 'name', 'one_liner', 'target_user', 'problem', 'solution', 'core_mechanism',
+    'strategy_mode_fit', 'taste_fit', 'rubric_fit', 'sponsor_fit', 'demo_flow', 'wow_moment',
+    'build_plan_summary', 'estimated_hours', 'critical_dependencies', 'fallbacks', 'failure_modes',
+    'score_breakdown', 'total_score',
+  ];
+  for (const [index, candidate] of candidates.entries()) {
+    if (!candidate || typeof candidate !== 'object') return fail(`Candidate ${index + 1} must be an object.`);
+    for (const field of requiredCandidateFields) {
+      const value = (candidate as unknown as Record<string, unknown>)[field];
+      if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+        return fail(`Candidate ${index + 1} is missing required field \`${field}\`.`);
+      }
+    }
+    if (typeof candidate.score_breakdown !== 'object' || candidate.score_breakdown === null || Array.isArray(candidate.score_breakdown)) {
+      return fail(`Candidate ${index + 1} has an invalid \`score_breakdown\`.`);
+    }
+    for (const [axis, score] of Object.entries(candidate.score_breakdown)) {
+      if (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 10) {
+        return fail(`Candidate ${index + 1} score \`${axis}\` must be a number from 0 to 10.`);
+      }
+    }
+  }
+
+  const requiredSelectedFields = ['id', 'name', 'selection_reason', 'why_now', 'why_this_team', 'why_this_competition', 'judge_memory_hook', 'core_demo_proof', 'primary_risk', 'fallback'];
+  for (const field of requiredSelectedFields) {
+    const value = (selected as unknown as Record<string, unknown>)[field];
+    if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+      return fail(`Imported selected idea is missing required field \`${field}\`.`);
+    }
+  }
+
+  const selectedCandidate = candidates.find((candidate) => candidate.id === selected.id || candidate.name === selected.name);
+  if (!selectedCandidate) {
+    return fail(`Selected idea "${selected.name}" must match a candidate by id or name.`);
+  }
+
+  // Agent-provided totals are advisory. Recalculate against the active strategy
+  // profile so imported data cannot bypass the idea gate with inflated scores.
+  for (const candidate of candidates) {
+    const scored = scoreIdea(candidate.score_breakdown, state.strategy.scoring_profile ?? SCORING_WEIGHTS[state.strategy.mode]);
+    candidate.score_breakdown = scored.breakdown;
+    candidate.total_score = scored.total;
   }
 
   // Persist with honest provenance: imported from agent
@@ -441,7 +489,7 @@ export async function cmdIdeaImport(store: StateStore, filePath: string): Promis
     imported_at: nowIso(),
     selected_idea: selected,
     alternatives: candidates
-      .filter((c) => c.name !== selected.name)
+      .filter((c) => c.id !== selectedCandidate.id)
       .map((c) => ({ id: c.id, name: c.name, total_score: c.total_score })),
   });
   if (!selWrite.ok) return fail(selWrite.error.message);
@@ -613,9 +661,13 @@ export async function cmdReplan(store: StateStore, orch: Orchestrator, opts: { r
   ensureInitialized(store);
   const loaded = store.load();
   if (!loaded.ok) return fail(loaded.error.message);
+  const checkpoint = store.createCheckpoint('pre-replan');
+  if (!checkpoint.ok) {
+    return fail(`Could not create checkpoint before replanning: ${checkpoint.error.message}`);
+  }
   const result = orch.replan(loaded.value, opts.reason ?? 'manual replan');
   if (!result.ok) return fail(result.error.message);
-  success('Replan triggered. Scope unlocked — re-run `hadk scope` after adjusting.');
+  success(`Replan triggered. Scope unlocked — re-run \`hadk scope\` after adjusting. Checkpoint ${checkpoint.value.id} created.`);
 }
 
 // ─── demo / judge / submit ───────────────────────────────────────────────────

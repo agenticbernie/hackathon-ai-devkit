@@ -5,7 +5,7 @@
 import type { DeadlineMode, Phase, StrategyMode } from './types.js';
 
 export const SCHEMA_VERSION = '1.0';
-export const HADK_VERSION = '2.0.1';
+export const HADK_VERSION = '2.0.3';
 export const STATE_DIR = '.hackathon';
 export const STATE_FILE = 'state.yaml';
 export const CONFIG_FILE = 'config.yaml';

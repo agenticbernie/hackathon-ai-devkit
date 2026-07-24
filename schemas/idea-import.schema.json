@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hadk.dev/schemas/idea-import.schema.json",
+  "title": "HADK external idea import",
+  "type": "object",
+  "required": ["schema_version", "candidates", "selected"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
+    "generation": { "type": "object" },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "selected": { "$ref": "#/$defs/selected" }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "required": ["id", "name", "one_liner", "target_user", "problem", "solution", "core_mechanism", "strategy_mode_fit", "taste_fit", "rubric_fit", "sponsor_fit", "demo_flow", "wow_moment", "build_plan_summary", "estimated_hours", "critical_dependencies", "fallbacks", "failure_modes", "score_breakdown", "total_score"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "one_liner": { "type": "string", "minLength": 1 },
+        "target_user": { "type": "string", "minLength": 1 },
+        "problem": { "type": "string", "minLength": 1 },
+        "solution": { "type": "string", "minLength": 1 },
+        "core_mechanism": { "type": "string", "minLength": 1 },
+        "strategy_mode_fit": { "type": "string", "minLength": 1 },
+        "taste_fit": { "type": "string", "minLength": 1 },
+        "rubric_fit": { "type": "string", "minLength": 1 },
+        "sponsor_fit": { "type": "string", "minLength": 1 },
+        "demo_flow": { "type": "array", "items": { "type": "string" } },
+        "wow_moment": { "type": "string", "minLength": 1 },
+        "future_thesis": { "type": ["string", "null"] },
+        "build_plan_summary": { "type": "string", "minLength": 1 },
+        "estimated_hours": { "type": "number", "minimum": 0 },
+        "critical_dependencies": { "type": "array", "items": { "type": "string" } },
+        "fallbacks": { "type": "array", "items": { "type": "string" } },
+        "failure_modes": { "type": "array", "items": { "type": "string" } },
+        "score_breakdown": { "type": "object", "additionalProperties": { "type": "number", "minimum": 0, "maximum": 10 } },
+        "total_score": { "type": "number", "minimum": 0, "maximum": 10 }
+      }
+    },
+    "selected": {
+      "type": "object",
+      "required": ["id", "name", "selection_reason", "why_now", "why_this_team", "why_this_competition", "judge_memory_hook", "core_demo_proof", "primary_risk", "fallback"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "selection_reason": { "type": "string", "minLength": 1 },
+        "why_now": { "type": "string", "minLength": 1 },
+        "why_this_team": { "type": "string", "minLength": 1 },
+        "why_this_competition": { "type": "string", "minLength": 1 },
+        "judge_memory_hook": { "type": "string", "minLength": 1 },
+        "core_demo_proof": { "type": "string", "minLength": 1 },
+        "primary_risk": { "type": "string", "minLength": 1 },
+        "fallback": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

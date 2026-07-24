@@ -149,4 +149,13 @@ describe('full fixture competition flow (real CLI, real artifacts)', () => {
     expect(state.gates.idea_gate).toBe('passed');
     expect(state.gates.scope_gate).toBe('passed');
   });
+
+  it('replan creates a rollback checkpoint before invalidating scope', () => {
+    const out = hadk(['replan', '--reason', 'test checkpoint safety']);
+    expect(out).toContain('Checkpoint');
+    const state = readYaml<any>('.hackathon', 'state.yaml');
+    expect(state.scope.status).toBe('unlocked');
+    expect(state.delivery.phase).toBe('scope');
+    expect(state.delivery.checkpoints.some((c: any) => c.label === 'pre-replan')).toBe(true);
+  });
 });

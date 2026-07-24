@@ -14,6 +14,20 @@ import { HyperFramesAdapter } from '@hadk/hyperframes-adapter';
 import { AgentAdapters } from '@hadk/agent-adapters';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+function persistRenderFailure(st: StateStore, blocker: string): void {
+  const attemptedAt = new Date().toISOString();
+  st.update((s) => {
+    s.delivery.video_status = 'failed';
+    s.gates.video_gate = 'failed';
+  });
+  st.writeArtifact('video', 'render-report.yaml', {
+    attempted_at: attemptedAt,
+    status: 'failed',
+    blocker,
+    video_gate: 'failed',
+  });
+}
 import {
   cmdSetup,
   cmdIngest,
@@ -299,14 +313,20 @@ video
             video_gate: 'passed',
           });
         } else {
-          warn('Render completed but no MP4 found. Check demo-video/output/.');
+          const blocker = 'Render completed but no MP4 was produced in demo-video/output/.';
+          persistRenderFailure(st, blocker);
+          warn(`${blocker} Render failure persisted in state.`);
         }
       } catch (e: any) {
-        warn(`Render failed (HyperFrames CLI may need setup): ${e.stderr ?? e.message}`);
+        const blocker = `Render failed (HyperFrames CLI may need setup): ${e.stderr ?? e.message}`;
+        persistRenderFailure(st, blocker);
+        warn(`${blocker} Render failure persisted in state.`);
         info('The composition remains valid and previewable: open demo-video/compositions/submission-video.html');
       }
     } else {
-      warn('HyperFrames CLI not found (tried hyperframes, hf). Install it to render the composition to MP4.');
+      const blocker = 'HyperFrames CLI not found (tried hyperframes, hf). Install it to render the composition to MP4.';
+      persistRenderFailure(st, blocker);
+      warn(`${blocker} Render failure persisted in state.`);
       info('Manually: cd demo-video && pnpm render');
       info('The composition remains valid and previewable: open demo-video/compositions/submission-video.html');
     }

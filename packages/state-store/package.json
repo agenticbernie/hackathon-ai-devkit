@@ -1,6 +1,6 @@
 {
   "name": "@hadk/state-store",
-  "version": "2.0.1",
+  "version": "2.0.3",
   "description": "Persistent competition state management for HADK — .hackathon/ directory, checkpoints, rollback, migration",
   "type": "module",
   "main": "dist/index.js",

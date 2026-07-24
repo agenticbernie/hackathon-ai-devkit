@@ -1,6 +1,6 @@
 {
   "name": "hackathon-ai-devkit",
-  "version": "2.0.1",
+  "version": "2.0.3",
   "private": true,
   "description": "AI-native Competition Engineering Harness — turn any competition brief into a winning strategy, scoped prototype, executable project scaffold, reliable demo, and submission-ready package.",
   "license": "MIT",
@@ -13,7 +13,7 @@
     "build": "pnpm -r run build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint packages/*/src tests --ext .ts",
+    "lint": "eslint \"packages/**/*.ts\" \"tests/**/*.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "validate": "node packages/cli/dist/index.js validate registry",
     "clean": "pnpm -r run clean"

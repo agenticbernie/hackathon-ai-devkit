@@ -1,6 +1,6 @@
 {
   "name": "@hadk/agent-adapters",
-  "version": "2.0.1",
+  "version": "2.0.3",
   "description": "Agent adapter generation for HADK — Claude Code, Codex, OpenCode instruction files from one canonical protocol",
   "type": "module",
   "main": "dist/index.js",

@@ -5,7 +5,7 @@ All notable changes to the HADK (Hackathon AI DevKit) project are documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.1] - 2026-07-23
+## [2.0.3] - 2026-07-25
 
 ### Fixed
 - **Installer**: enforces `pnpm` for the pnpm-workspace monorepo. Auto-bootstraps pnpm via Corepack when missing and fails with clear instructions if Corepack is unavailable. Removes misleading npm fallback.
@@ -16,9 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Generated tests**: replaced fake-pass `expect(true).toBe(true)` tests with honest `it.todo('implements the feature contract')` and contract-oriented todos.
 - **API routes**: generated Next.js routes now include design-contract comments and proper 400 error handling for invalid JSON bodies.
 - **Video render**: `hadk video render` now detects the HyperFrames CLI (`hyperframes` or `hf`), attempts a real render, verifies the produced MP4, and reports honest status when the CLI is unavailable.
-- **Version**: synchronized version to `2.0.1` across root `package.json`, all workspace packages, `HADK_VERSION`, and the implementation report.
+- **Version**: synchronized version to `2.0.3` across root `package.json`, all workspace packages, `HADK_VERSION`, and the implementation report.
 
 ### Added
+- **Idea import contract**: external agent results now have a documented schema, validated candidate fields, recalculated scores, and selected-candidate consistency checks.
+- **Render failure reporting**: failed or blocked video renders persist `video_status`, `video_gate`, and a render report for `hadk status` and `hadk next`.
 - Provenance metadata in generated idea artifacts: `generation_mode` (`heuristic_fallback` | `agent_guided`) and `confidence` (`low` | `medium` | `high`).
 - CLI flags `--agent` and `--provider` on `hadk idea` to declare intended agent/provider execution.
 
