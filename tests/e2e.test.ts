@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, existsSync, copyFileSync, readdirSync, mkdirSync, 
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stripVTControlCharacters } from 'node:util';
 import { readYamlFile } from '@hadk/core';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -136,7 +137,7 @@ describe('full fixture competition flow (real CLI, real artifacts)', () => {
     // models that completed project-install step without fetching packages.
     mkdirSync(join(dir, 'prototype', 'node_modules'));
     const buildOut = hadk(['validate', 'build']);
-    expect(buildOut).toContain('PASS  build');
+    expect(stripVTControlCharacters(buildOut)).toContain('PASS  build');
     const demoOut = hadk(['demo']);
     expect(demoOut).toContain('Demo path validated');
     const out = hadk(['video', 'generate']);
