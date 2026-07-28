@@ -29,6 +29,11 @@ export class AgentAdapters {
     const filesWritten: string[] = [];
     const detected = this.detectAgents(root);
 
+    if (detected.length === 0) {
+      this.store.log('adapters', 'No supported coding agents detected; no instruction files created.');
+      return ok({ files_written: filesWritten, detected_agents: detected });
+    }
+
     // Canonical protocol source
     const hackathonMd = join(root, 'HACKATHON.md');
     this.writeIfManaged(hackathonMd, this.canonicalProtocol());
@@ -40,7 +45,7 @@ export class AgentAdapters {
     filesWritten.push('AGENTS.md');
 
     // Claude Code adapter
-    if (detected.includes('claude-code') || true) {
+    if (detected.includes('claude-code')) {
       const claudeDir = join(root, '.claude');
       mkdirSync(claudeDir, { recursive: true });
       const claudeInstructions = join(claudeDir, 'HACKATHON.md');
@@ -49,18 +54,22 @@ export class AgentAdapters {
     }
 
     // Codex adapter
-    const codexDir = join(root, '.codex');
-    mkdirSync(codexDir, { recursive: true });
-    const codexInstructions = join(codexDir, 'HACKATHON.md');
-    this.writeIfManaged(codexInstructions, this.codexWrapper());
-    filesWritten.push('.codex/HACKATHON.md');
+    if (detected.includes('codex')) {
+      const codexDir = join(root, '.codex');
+      mkdirSync(codexDir, { recursive: true });
+      const codexInstructions = join(codexDir, 'HACKATHON.md');
+      this.writeIfManaged(codexInstructions, this.codexWrapper());
+      filesWritten.push('.codex/HACKATHON.md');
+    }
 
     // OpenCode / generic .agents adapter
-    const agentsDir = join(root, '.agents');
-    mkdirSync(agentsDir, { recursive: true });
-    const openCodeInstructions = join(agentsDir, 'HACKATHON.md');
-    this.writeIfManaged(openCodeInstructions, this.openCodeWrapper());
-    filesWritten.push('.agents/HACKATHON.md');
+    if (detected.includes('opencode')) {
+      const agentsDir = join(root, '.agents');
+      mkdirSync(agentsDir, { recursive: true });
+      const openCodeInstructions = join(agentsDir, 'HACKATHON.md');
+      this.writeIfManaged(openCodeInstructions, this.openCodeWrapper());
+      filesWritten.push('.agents/HACKATHON.md');
+    }
 
     this.store.log('adapters', `Installed agent adapters for: ${detected.join(', ') || 'generic'}.`);
     return ok({ files_written: filesWritten, detected_agents: detected });

@@ -1,6 +1,6 @@
 {
   "name": "hackathon-ai-devkit",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "private": true,
   "description": "AI-native Competition Engineering Harness — turn any competition brief into a winning strategy, scoped prototype, executable project scaffold, reliable demo, and submission-ready package.",
   "license": "MIT",

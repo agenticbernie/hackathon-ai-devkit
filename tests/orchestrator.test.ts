@@ -116,4 +116,19 @@ describe('orchestrator status and next action', () => {
     expect(typeof next.command).toBe('string');
     expect(next.command.length).toBeGreaterThan(0);
   });
+
+  it('does not skip strategy when its profile has not been selected', () => {
+    const s = createDefaultState();
+    s.delivery.phase = 'strategy';
+    const next = orch.getNextAction(s);
+    expect(next.command).toBe('hadk strategy');
+  });
+
+  it('recommends render after a video project is generated', () => {
+    const s = createDefaultState();
+    s.delivery.phase = 'video';
+    s.delivery.video_status = 'project_generated';
+    const next = orch.getNextAction(s);
+    expect(next.command).toBe('hadk video render');
+  });
 });

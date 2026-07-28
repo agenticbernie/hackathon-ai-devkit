@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, copyFileSync, readdirSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,11 +12,12 @@ const fixtureBrief = join(repoRoot, 'tests', 'fixtures', 'sample-hackathon', 'br
 
 let dir: string;
 
-function hadk(args: string[]): string {
+function hadk(args: string[], env?: NodeJS.ProcessEnv): string {
   return execFileSync(process.execPath, [cliBin, ...args], {
     cwd: dir,
     encoding: 'utf-8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    env: env ?? process.env,
   });
 }
 
@@ -130,6 +131,14 @@ describe('full fixture competition flow (real CLI, real artifacts)', () => {
   });
 
   it('video generate produces a complete HyperFrames project', () => {
+    // Build validation requires dependencies to be installed before the demo
+    // gate can be earned. The scaffold is structural, so a fixture directory
+    // models that completed project-install step without fetching packages.
+    mkdirSync(join(dir, 'prototype', 'node_modules'));
+    const buildOut = hadk(['validate', 'build']);
+    expect(buildOut).toContain('PASS  build');
+    const demoOut = hadk(['demo']);
+    expect(demoOut).toContain('Demo path validated');
     const out = hadk(['video', 'generate']);
     expect(out).toContain('Video project generated');
     const videoDir = join(dir, 'demo-video');
@@ -138,6 +147,28 @@ describe('full fixture competition flow (real CLI, real artifacts)', () => {
     expect(existsSync(join(videoDir, 'compositions', 'submission-video.html'))).toBe(true);
     const storyboard = readYaml<any>('demo-video', 'storyboard.yaml');
     expect(storyboard.scenes.length).toBeGreaterThan(0);
+  });
+
+  it('renders from the generated project directory when HyperFrames is available', () => {
+    const fakeBin = join(dir, 'fakebin');
+    mkdirSync(fakeBin);
+    const fakeHyperFrames = join(fakeBin, 'hyperframes');
+    writeFileSync(fakeHyperFrames, '#!/usr/bin/env bash\nif [ "$1" = "render" ] && [ "$2" = "--help" ]; then exit 0; fi\nmkdir -p "$(dirname "$4")"\ntouch "$4"\n', 'utf-8');
+    chmodSync(fakeHyperFrames, 0o755);
+
+    const out = hadk(['video', 'render'], { ...process.env, PATH: `${fakeBin}:${process.env.PATH}` });
+    expect(out).toContain('MP4 rendered');
+    const state = readYaml<any>('.hackathon', 'state.yaml');
+    expect(state.gates.video_gate).toBe('passed');
+    expect(state.delivery.phase).toBe('judge');
+  });
+
+  it('prepares judge material and completes a submission with a repository URL', () => {
+    expect(hadk(['judge'])).toContain('Judge preparation artifact written');
+    expect(hadk(['submit', '--repository', 'https://github.com/example/project'])).toContain('Submission package prepared');
+    const state = readYaml<any>('.hackathon', 'state.yaml');
+    expect(state.gates.submission_gate).toBe('passed');
+    expect(state.delivery.phase).toBe('complete');
   });
 
   it('produced state.yaml reflects the full pipeline', () => {

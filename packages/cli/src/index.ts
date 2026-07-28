@@ -219,6 +219,13 @@ program
     }
 
     const result = runValidator(t as ValidatorName, s, root);
+    if (t === 'build' && result.passed) {
+      const updated = s.update((state) => {
+        state.gates.build_gate = 'passed';
+        if (state.delivery.phase === 'build') state.delivery.phase = 'demo';
+      });
+      if (!updated.ok) return fail(updated.error.message);
+    }
     printValidationResults([result], opts.json);
     process.exitCode = result.passed ? 0 : 1;
   });
@@ -249,7 +256,13 @@ video
   .description('Generate the complete demo-video/ HyperFrames project')
   .option('--duration <seconds>', 'video duration in seconds', '60')
   .action(async (opts) => {
-    const adapter = new HyperFramesAdapter(store());
+    const st = store();
+    const loaded = st.load();
+    if (!loaded.ok) return fail(loaded.error.message);
+    if (loaded.value.gates.demo_gate !== 'passed') {
+      return fail('Demo gate has not passed.', 'Run `hadk demo` after `hadk validate build`.');
+    }
+    const adapter = new HyperFramesAdapter(st);
     const result = adapter.generate({ durationSeconds: parseInt(opts.duration, 10) });
     if (!result.ok) return fail(result.error.message, result.error.hint);
     const r = result.value;
@@ -273,23 +286,22 @@ video
   .command('render')
   .description('Render the composition to MP4 (requires HyperFrames CLI)')
   .action(async () => {
-    const adapter = new HyperFramesAdapter(store());
+    const st = store();
+    const loaded = st.load();
+    if (!loaded.ok) return fail(loaded.error.message);
+    if (loaded.value.delivery.phase !== 'video') {
+      return fail('Video rendering is only available during the video phase.', 'Complete build validation and `hadk demo` first.');
+    }
+    const adapter = new HyperFramesAdapter(st);
     const validation = adapter.validate();
     if (!validation.ok) return fail(validation.error.message);
     if (!validation.value.passed) return fail(`Video project invalid: ${validation.value.issues.join('; ')}`);
 
     const { execSync } = await import('node:child_process');
     const { existsSync, statSync } = await import('node:fs');
-    const st = store();
-    const videoDir = join(st.artifactsDir, 'video', 'demo-video');
+    const videoDir = join(st.projectRoot, 'demo-video');
 
-    // Try to find HyperFrames CLI
-    let hfBin = '';
-    try { hfBin = execSync('which hyperframes 2>/dev/null || true', { encoding: 'utf-8' }).trim(); } catch { /* ignore */ }
-    if (!hfBin) { try { hfBin = execSync('which hf 2>/dev/null || true', { encoding: 'utf-8' }).trim(); } catch { /* ignore */ } }
-
-    if (hfBin && existsSync(join(videoDir, 'package.json'))) {
-      info(`HyperFrames CLI found: ${hfBin}`);
+    if (existsSync(join(videoDir, 'package.json'))) {
       try {
         info('Rendering video…');
         execSync('pnpm render', { cwd: videoDir, encoding: 'utf-8', stdio: 'pipe', timeout: 300_000 });
@@ -324,7 +336,7 @@ video
         info('The composition remains valid and previewable: open demo-video/compositions/submission-video.html');
       }
     } else {
-      const blocker = 'HyperFrames CLI not found (tried hyperframes, hf). Install it to render the composition to MP4.';
+      const blocker = 'Video project package.json is missing. Re-run `hadk video generate` before rendering.';
       persistRenderFailure(st, blocker);
       warn(`${blocker} Render failure persisted in state.`);
       info('Manually: cd demo-video && pnpm render');
@@ -357,7 +369,8 @@ program
 program
   .command('submit')
   .description('Prepare and validate the submission package')
-  .action(async () => cmdSubmit(store()));
+  .requiredOption('--repository <url>', 'public repository URL for the submission')
+  .action(async (opts) => cmdSubmit(store(), opts));
 
 // ─── update ──────────────────────────────────────────────────────────────────
 program

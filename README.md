@@ -1,6 +1,6 @@
 # Hackathon AI DevKit (HADK)
 
-**Version: 2.0.4**
+**Version: 2.0.5**
 
 > **Turn any competition brief into a winning strategy, scoped prototype,
 > executable project scaffold, reliable demo, and submission-ready package.**

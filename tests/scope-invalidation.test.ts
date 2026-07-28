@@ -60,6 +60,24 @@ describe('scope --unlock', () => {
   });
 });
 
+describe('deadline-aware scope', () => {
+  it('uses a near deadline to size a scope that can actually fit', async () => {
+    store.update((s) => {
+      s.scope.status = 'unlocked';
+      s.delivery.phase = 'scope';
+      s.competition.remaining_hours = 48;
+      s.competition.deadline = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString();
+    });
+    await cmdScope(store, {});
+    const loaded = store.load();
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    const estimate = loaded.value.scope.mvp_features.reduce((total, feature) => total + feature.estimated_hours, 0);
+    expect(loaded.value.scope.status).toBe('locked');
+    expect(estimate).toBeLessThanOrEqual(5);
+  });
+});
+
 describe('hadk replan', () => {
   it('cascades invalidation through scope_gate and downstream gates', async () => {
     const orch = new Orchestrator(store);

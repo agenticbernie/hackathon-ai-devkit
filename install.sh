@@ -138,6 +138,11 @@ fi
 
 if [ -n "$LOCAL_SOURCE" ]; then
   info "Installing from local checkout: $LOCAL_SOURCE"
+  if [ -d "$HADK_INSTALL_DIR" ] && [ ! -f "$INSTALL_MANIFEST" ] && [ -n "$(ls -A "$HADK_INSTALL_DIR" 2>/dev/null)" ]; then
+    fail "Refusing to install into non-empty unmanaged directory: $HADK_INSTALL_DIR"
+    fail "Choose an empty HADK_INSTALL_DIR or move existing files first."
+    exit 1
+  fi
   mkdir -p "$HADK_INSTALL_DIR"
   # Copy source into the install dir (idempotent rsync-style copy).
   if command -v rsync >/dev/null 2>&1; then

@@ -25,7 +25,7 @@ import {
   nowIso,
 } from '@hadk/core';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, readdirSync, copyFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 
 // ─── Default State ───────────────────────────────────────────────────────────
 
@@ -276,7 +276,10 @@ export class StateStore {
 
   rollback(checkpointId?: string): Result<CompetitionState> {
     const loaded = this.load();
-    if (!loaded.ok) return loaded;
+    if (!loaded.ok) {
+      if (!checkpointId && existsSync(this.statePath + '.bak')) return this.restoreBackup();
+      return loaded;
+    }
     const state = loaded.value;
 
     const checkpoints = state.delivery.checkpoints;
@@ -323,6 +326,34 @@ export class StateStore {
     if (!result.ok) return err(hadkError('ARTIFACT_WRITE_FAILED', `Failed to write artifact: ${result.error.message}`));
     this.log('artifact', `Wrote artifact ${category}/${filename}`);
     return ok(filePath);
+  }
+
+  writeTextArtifact(category: string, filename: string, content: string): Result<string> {
+    try {
+      const filePath = this.artifactPath(category, filename);
+      mkdirSync(dirname(filePath), { recursive: true });
+      writeFileSync(filePath, content, 'utf-8');
+      this.log('artifact', `Wrote artifact ${category}/${filename}`);
+      return ok(filePath);
+    } catch (e) {
+      return err(hadkError('ARTIFACT_WRITE_FAILED', `Failed to write artifact: ${(e as Error).message}`));
+    }
+  }
+
+  private restoreBackup(): Result<CompetitionState> {
+    const backupPath = this.statePath + '.bak';
+    const backup = readYamlFile<CompetitionState>(backupPath);
+    if (!backup.ok) return backup;
+    if (!backup.value?.schema_version || !backup.value.gates) {
+      return err(hadkError('BACKUP_CORRUPTED', `State backup at ${backupPath} is invalid.`));
+    }
+    try {
+      copyFileSync(backupPath, this.statePath);
+      this.log('rollback', 'Restored state.yaml from state.yaml.bak after state corruption.');
+      return ok(backup.value);
+    } catch (e) {
+      return err(hadkError('BACKUP_RESTORE_FAILED', `Failed to restore ${backupPath}: ${(e as Error).message}`));
+    }
   }
 
   readArtifact<T>(category: string, filename: string): Result<T> {

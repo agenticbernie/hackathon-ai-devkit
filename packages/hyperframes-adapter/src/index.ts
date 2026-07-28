@@ -434,10 +434,10 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, statSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-function detectHyperFrames(): string | null {
+function detectHyperFrames() {
   for (const bin of ['hyperframes', 'hf']) {
     try {
-      execFileSync(bin, ['--version'], { stdio: 'ignore' });
+      execFileSync(bin, ['render', '--help'], { stdio: 'ignore' });
       return bin;
     } catch {
       // try next alias
@@ -604,7 +604,7 @@ The composition remains valid and previewable; MP4 output requires the toolchain
     for (const bin of ['hyperframes', 'hf']) {
       try {
         // Use execFileSync with an argv array (no shell interpolation).
-        execFileSync(bin, ['--version'], { stdio: 'ignore' });
+        execFileSync(bin, ['render', '--help'], { stdio: 'ignore' });
         return true;
       } catch {
         // try next alias

@@ -77,6 +77,17 @@ describe('atomic writes and corruption protection', () => {
       expect(loaded.error.code).toBe('STATE_CORRUPTED');
     }
   });
+
+  it('restores state.yaml.bak when rollback is requested after corruption', () => {
+    store.init();
+    store.update((s) => { s.competition.name = 'Recoverable'; });
+    store.update((s) => { s.competition.name = 'Newer'; });
+    writeFileSync(store.statePath, 'not: valid: yaml: [', 'utf-8');
+
+    const restored = store.rollback();
+    expect(restored.ok).toBe(true);
+    if (restored.ok) expect(restored.value.competition.name).toBe('Recoverable');
+  });
 });
 
 describe('schema migration', () => {

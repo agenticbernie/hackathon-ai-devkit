@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { StateStore } from '@hadk/state-store';
-import { cmdStrategy } from '@hadk/cli';
+import { cmdStrategy, cmdIdea } from '@hadk/cli';
 
 let dir: string;
 let store: StateStore;
@@ -75,5 +75,15 @@ describe('strategy --taste user', () => {
     const state = loaded.value;
     expect(state.strategy.taste_source).toBe('auto_fallback');
     expect(state.strategy.idea_taste.technology.length).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('idea agent handoff', () => {
+  it('writes a usable Markdown prompt instead of YAML-serializing it', async () => {
+    await cmdStrategy(store, { mode: 'realistic', taste: 'auto' });
+    await cmdIdea(store, { agentHandoff: true, agent: 'opencode' });
+    const prompt = readFileSync(store.artifactPath('generated', 'idea-agent-prompt.md'), 'utf-8');
+    expect(prompt).toMatch(/^# HADK Agent Handoff:/);
+    expect(prompt).not.toMatch(/^>/);
   });
 });

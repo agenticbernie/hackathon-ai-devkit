@@ -19,6 +19,7 @@ import {
   nowIso,
   readYamlFile,
   weightsSumToOne,
+  remainingHours,
 } from '@hadk/core';
 import { StateStore } from '@hadk/state-store';
 import { Orchestrator, scoreIdea } from '@hadk/orchestrator';
@@ -94,6 +95,7 @@ export async function cmdIngest(
     // Attempt fetch; record blocker honestly if unavailable
     try {
       const res = await fetch(source, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) return fail(`Could not fetch URL: ${res.status} ${res.statusText}.`);
       rawContent = await res.text();
     } catch (e) {
       warn(`Could not fetch URL (${(e as Error).message}). Recording source with low confidence.`);
@@ -133,10 +135,8 @@ export async function cmdIngest(
     s.competition.judging_criteria = parsed.judging_criteria;
     s.competition.sponsor_requirements = parsed.sponsor_requirements;
     s.competition.deadline = parsed.event_metadata.submission_deadline;
-    if (s.delivery.phase === 'competition-intelligence') {
-      s.gates.competition_gate = parsed.tracks.length > 0 ? 'passed' : 'failed';
-      if (parsed.tracks.length > 0) s.delivery.phase = 'strategy';
-    }
+    s.gates.competition_gate = parsed.tracks.length > 0 ? 'passed' : 'failed';
+    if (parsed.tracks.length > 0) s.delivery.phase = 'strategy';
   });
 
   success(`Competition ingested: ${parsed.event_metadata.name ?? '(unknown)'}`);
@@ -152,11 +152,16 @@ export async function cmdConfigure(
   opts: { teamSize?: string; teamSkills?: string; deadline?: string; remainingHours?: string },
 ): Promise<void> {
   ensureInitialized(store);
+  const teamSize = opts.teamSize === undefined ? undefined : Number(opts.teamSize);
+  const remaining = opts.remainingHours === undefined ? undefined : Number(opts.remainingHours);
+  if (teamSize !== undefined && (!Number.isInteger(teamSize) || teamSize < 1)) return fail('--team-size must be a positive integer.');
+  if (remaining !== undefined && (!Number.isFinite(remaining) || remaining < 0)) return fail('--remaining-hours must be a non-negative number.');
+  if (opts.deadline && Number.isNaN(new Date(opts.deadline).getTime())) return fail('--deadline must be a valid ISO-8601 timestamp.');
   store.update((s) => {
-    if (opts.teamSize) s.team.size = parseInt(opts.teamSize, 10);
+    if (teamSize !== undefined) s.team.size = teamSize;
     if (opts.teamSkills) s.team.skills = opts.teamSkills.split(',').map((x) => x.trim()).filter(Boolean);
     if (opts.deadline) s.competition.deadline = opts.deadline;
-    if (opts.remainingHours) s.competition.remaining_hours = parseFloat(opts.remainingHours);
+    if (remaining !== undefined) s.competition.remaining_hours = remaining;
   });
   success('Configuration updated.');
 }
@@ -308,7 +313,7 @@ function buildAgentIdeaPrompt(state: CompetitionState, agent?: string, provider?
     '6. Recommend a winning idea and 2 runner-ups.',
     '',
     '## Output Format',
-    'Write your result as YAML matching `schemas/idea-import.schema.json` and save it as `.hackathon/artifacts/ideas/result.yaml`.',
+    'Write your result as YAML matching `schemas/idea-import.schema.json`. Use raw 0-10 values and `score_breakdown_kind: raw`, then save it as `.hackathon/artifacts/ideas/result.yaml`.',
     '',
     `Intended agent: ${agent ?? 'unspecified'}`,
     `Intended provider: ${provider ?? 'unspecified'}`,
@@ -331,7 +336,7 @@ export async function cmdIdea(store: StateStore, opts: { count?: string; agent?:
   // Agent handoff: export a prompt pack and stop; do not claim agent-guided generation.
   if (opts.agentHandoff) {
     const prompt = buildAgentIdeaPrompt(state, opts.agent, opts.provider);
-    const promptResult = store.writeArtifact('generated', 'idea-agent-prompt.md', prompt);
+    const promptResult = store.writeTextArtifact('generated', 'idea-agent-prompt.md', prompt);
     if (!promptResult.ok) return fail(promptResult.error.message);
     success('Agent handoff prompt exported.');
     info(`Prompt: ${promptResult.value}`);
@@ -359,6 +364,7 @@ export async function cmdIdea(store: StateStore, opts: { count?: string; agent?:
   for (const c of candidates) {
     const { breakdown, total } = scoreIdea(c.score_breakdown, state.strategy.scoring_profile);
     c.score_breakdown = breakdown;
+    c.score_breakdown_kind = 'weighted';
     c.total_score = total;
   }
   candidates.sort((a, b) => b.total_score - a.total_score);
@@ -443,11 +449,19 @@ export async function cmdIdeaImport(store: StateStore, filePath: string): Promis
     return fail(`Selected idea id "${selected.id}" and name "${selected.name}" refer to different candidates.`);
   }
 
-  // Agent-provided totals are advisory. Recalculate against the active strategy
-  // profile so imported data cannot bypass the idea gate with inflated scores.
+  const profile = state.strategy.scoring_profile ?? SCORING_WEIGHTS[state.strategy.mode];
+  const axes = Object.keys(profile);
+  // Agent-provided totals are advisory. Require every strategy axis instead of
+  // silently inventing a neutral score, then normalize raw or weighted input.
   for (const candidate of candidates) {
-    const scored = scoreIdea(candidate.score_breakdown, state.strategy.scoring_profile ?? SCORING_WEIGHTS[state.strategy.mode]);
+    const missing = axes.filter((axis) => typeof candidate.score_breakdown[axis] !== 'number');
+    if (missing.length > 0) return fail(`Candidate "${candidate.name}" is missing strategy scores: ${missing.join(', ')}.`);
+    const rawScores = candidate.score_breakdown_kind === 'weighted'
+      ? Object.fromEntries(axes.map((axis) => [axis, candidate.score_breakdown[axis] / profile[axis]]))
+      : candidate.score_breakdown;
+    const scored = scoreIdea(rawScores, profile);
     candidate.score_breakdown = scored.breakdown;
+    candidate.score_breakdown_kind = 'weighted';
     candidate.total_score = scored.total;
   }
 
@@ -530,11 +544,9 @@ export async function cmdScope(store: StateStore, opts: { unlock?: boolean }): P
     return;
   }
 
-  // Build a scope contract from the selected idea artifact
-  const selectedArtifact = store.readArtifact<{ selected_idea: SelectedIdea }>('ideas', 'selected.yaml');
   const ideaName = state.strategy.selected_idea;
 
-  const available = state.competition.remaining_hours ?? 48;
+  const available = remainingHours(state.competition.deadline, state.competition.remaining_hours) ?? 48;
   const scope = buildScopeContract(state, ideaName, available);
 
   store.writeArtifact('scope', 'scope.yaml', scope);
@@ -659,6 +671,9 @@ export async function cmdDemo(store: StateStore): Promise<void> {
   if (!loaded.ok) return fail(loaded.error.message);
   const state = loaded.value;
 
+  if (state.gates.build_gate !== 'passed') {
+    return fail('Build gate has not passed.', 'Run `hadk validate build` after installing and building the generated project.');
+  }
   if (state.scope.demo_flow.length === 0) {
     return fail('No demo flow defined.', 'Lock scope with `hadk scope` first.');
   }
@@ -683,6 +698,10 @@ export async function cmdJudge(store: StateStore): Promise<void> {
   if (!loaded.ok) return fail(loaded.error.message);
   const state = loaded.value;
 
+  if (state.gates.video_gate !== 'passed') {
+    return fail('Video gate has not passed.', 'Run `hadk video render` and resolve any render blocker first.');
+  }
+
   const criteria = state.competition.judging_criteria.map((c) => c.name);
   store.writeArtifact('pitch', 'judge-prep.yaml', {
     prepared_at: nowIso(),
@@ -698,19 +717,26 @@ export async function cmdJudge(store: StateStore): Promise<void> {
   success('Judge preparation artifact written to .hackathon/artifacts/pitch/.');
 }
 
-export async function cmdSubmit(store: StateStore): Promise<void> {
+export async function cmdSubmit(store: StateStore, opts: { repository?: string }): Promise<void> {
   ensureInitialized(store);
   const loaded = store.load();
   if (!loaded.ok) return fail(loaded.error.message);
   const state = loaded.value;
+
+  if (state.delivery.phase !== 'submission' || !store.listArtifacts('pitch').includes('judge-prep.yaml')) {
+    return fail('Judge preparation is required before submission.', 'Run `hadk judge` after the video gate passes.');
+  }
+  if (!opts.repository || !/^https:\/\//.test(opts.repository)) {
+    return fail('A public repository URL is required for submission.', 'Run `hadk submit --repository https://github.com/org/repo`.');
+  }
 
   store.writeArtifact('submission', 'submission.yaml', {
     prepared_at: nowIso(),
     competition: state.competition.name,
     project: state.strategy.selected_idea,
     description: `Submission for ${state.competition.name ?? 'competition'}.`,
-    repository_link: null,
-    video_artifact: state.delivery.video_status !== 'not_started',
+    repository_link: opts.repository,
+    video_artifact: state.delivery.video_status === 'rendered',
     pitch_artifact: store.listArtifacts('pitch').length > 0,
     sponsor_evidence: state.competition.sponsor_requirements.map((r) => r.sponsor),
     checklist: [
@@ -907,6 +933,7 @@ function generateCandidateIdeas(state: CompetitionState, count: number): Candida
       fallbacks: ['Deterministic fallback mode with canned responses'],
       failure_modes: ['External API latency during demo'],
       score_breakdown: scores,
+      score_breakdown_kind: 'raw',
       total_score: 0,
     });
   }
@@ -914,7 +941,7 @@ function generateCandidateIdeas(state: CompetitionState, count: number): Candida
 }
 
 function buildScopeContract(state: CompetitionState, ideaName: string, availableHours: number) {
-  const hoursPer = Math.max(2, Math.floor((availableHours * 0.6) / 4));
+  const hoursPer = Math.max(0.1, Math.floor((availableHours / 4.5) * 10) / 10);
   return {
     schema_version: '1.0',
     project: { name: ideaName, type: state.competition.type },
@@ -929,7 +956,7 @@ function buildScopeContract(state: CompetitionState, ideaName: string, available
         { id: 'core_mechanism', name: 'Core mechanism', purpose: 'The single thing the project must prove', required_for_demo: true, required_for_rubric: true, estimated_hours: hoursPer * 2, dependencies: [], fallback: 'Deterministic fallback mode' },
         { id: 'input_surface', name: 'Input surface', purpose: 'Let a user provide input for the demo', required_for_demo: true, required_for_rubric: false, estimated_hours: hoursPer, dependencies: [], fallback: 'Hardcoded demo input' },
         { id: 'output_view', name: 'Output view', purpose: 'Show the result clearly to judges', required_for_demo: true, required_for_rubric: true, estimated_hours: hoursPer, dependencies: ['core_mechanism'], fallback: 'Static screenshot' },
-        { id: 'demo_data', name: 'Demo data & reset', purpose: 'Deterministic, reproducible demo state', required_for_demo: true, required_for_rubric: false, estimated_hours: Math.max(2, Math.floor(hoursPer / 2)), dependencies: [], fallback: 'Seed script' },
+        { id: 'demo_data', name: 'Demo data & reset', purpose: 'Deterministic, reproducible demo state', required_for_demo: true, required_for_rubric: false, estimated_hours: Math.max(0.1, Math.floor((hoursPer / 2) * 10) / 10), dependencies: [], fallback: 'Seed script' },
       ],
       deferred_features: [
         { id: 'auth', name: 'Authentication', reason_deferred: 'Not required for the demo path' },

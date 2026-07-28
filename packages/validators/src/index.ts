@@ -14,6 +14,7 @@ import {
   nowIso,
   readYamlFile,
   weightsSumToOne,
+  remainingHours,
 } from '@hadk/core';
 import { StateStore } from '@hadk/state-store';
 import { existsSync, readdirSync } from 'node:fs';
@@ -219,7 +220,7 @@ export function validateScope(state: CompetitionState): ValidationResult {
 
   // Budget fits time
   const totalHours = state.scope.mvp_features.reduce((sum, f) => sum + f.estimated_hours, 0);
-  const available = state.competition.remaining_hours ?? 48;
+  const available = remainingHours(state.competition.deadline, state.competition.remaining_hours) ?? 48;
   if (totalHours > available) {
     issues.push(error('BUDGET_EXCEEDED', `MVP estimate ${totalHours}h exceeds available ${available}h.`));
   }
@@ -300,7 +301,7 @@ export function validateDemo(state: CompetitionState): ValidationResult {
 
   // Deterministic demo state: check for reset capability
   if (state.delivery.demo_status === 'not_started') {
-    issues.push(warning('DEMO_NOT_VALIDATED', 'Demo has not been validated end-to-end.'));
+    issues.push(error('DEMO_NOT_VALIDATED', 'Demo has not been validated end-to-end.'));
   }
 
   // External dependencies have fallback
@@ -316,6 +317,8 @@ export function validateDemo(state: CompetitionState): ValidationResult {
 export function validateVideo(store: StateStore): ValidationResult {
   const issues: ValidationIssue[] = [];
   const videoDir = join(store.projectRoot, 'demo-video');
+  const loaded = store.load();
+  if (!loaded.ok) return result('video', [error('STATE_INVALID', loaded.error.message)]);
 
   if (!existsSync(videoDir)) {
     issues.push(error('NO_VIDEO_PROJECT', 'No demo-video/ project found. Run `hadk video generate`.'));
@@ -336,6 +339,9 @@ export function validateVideo(store: StateStore): ValidationResult {
   if (!existsSync(composition)) {
     issues.push(error('NO_COMPOSITION', 'compositions/submission-video.html missing.'));
   }
+  if (loaded.value.delivery.video_status !== 'rendered') {
+    issues.push(error('VIDEO_NOT_RENDERED', 'Video has not been rendered and verified. Run `hadk video render`.'));
+  }
 
   return result('video', issues);
 }
@@ -353,11 +359,11 @@ export function validateSubmission(state: CompetitionState, store: StateStore): 
 
   const submissionArtifacts = store.listArtifacts('submission');
   if (submissionArtifacts.length === 0) {
-    issues.push(warning('NO_SUBMISSION_ARTIFACTS', 'No submission artifacts prepared. Run `hadk submit`.'));
+    issues.push(error('NO_SUBMISSION_ARTIFACTS', 'No submission artifacts prepared. Run `hadk submit`.'));
   }
 
   if (state.delivery.video_status === 'not_started') {
-    issues.push(warning('NO_VIDEO', 'No video artifact for submission.'));
+    issues.push(error('NO_VIDEO', 'No rendered video artifact for submission.'));
   }
 
   return result('submission', issues);
@@ -418,7 +424,7 @@ export function validateBuild(store: StateStore): ValidationResult {
 
   const hasNodeModules = existsSync(join(protoDir, 'node_modules'));
   if (!hasNodeModules) {
-    issues.push(warning('DEPS_NOT_INSTALLED', 'node_modules not found — run the install command from hadk.project.yaml.'));
+    issues.push(error('DEPS_NOT_INSTALLED', 'node_modules not found — run the install command from hadk.project.yaml.'));
   }
 
   issues.push(info('BUILD_MANUAL', 'Full build validation (install, typecheck, test, startup, health) requires running the project. See hadk.project.yaml for commands.'));

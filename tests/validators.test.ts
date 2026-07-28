@@ -75,6 +75,15 @@ describe('scope validation', () => {
     expect(result.issues.some((i) => i.code === 'BUDGET_EXCEEDED')).toBe(true);
   });
 
+  it('uses an absolute deadline over stale remaining_hours', () => {
+    const s = validScopeState();
+    s.competition.remaining_hours = 48;
+    s.competition.deadline = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    s.scope.mvp_features = [feature('big', { estimated_hours: 2 })];
+    const result = validateScope(s);
+    expect(result.issues.some((i) => i.code === 'BUDGET_EXCEEDED')).toBe(true);
+  });
+
   it('fails when an external dependency has no fallback', () => {
     const s = validScopeState();
     s.scope.external_dependencies = [{ name: 'API', type: 'api', risk: 'high', fallback: null } as any];

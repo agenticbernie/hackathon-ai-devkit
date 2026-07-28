@@ -5,7 +5,7 @@ All notable changes to the HADK (Hackathon AI DevKit) project are documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.4] - 2026-07-25
+## [2.0.5] - 2026-07-28
 
 ### Fixed
 - **Installer**: enforces `pnpm` for the pnpm-workspace monorepo. Auto-bootstraps pnpm via Corepack when missing and fails with clear instructions if Corepack is unavailable. Removes misleading npm fallback.
@@ -16,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Generated tests**: replaced fake-pass `expect(true).toBe(true)` tests with honest `it.todo('implements the feature contract')` and contract-oriented todos.
 - **API routes**: generated Next.js routes now include design-contract comments and proper 400 error handling for invalid JSON bodies.
 - **Video render**: `hadk video render` now detects the HyperFrames CLI (`hyperframes` or `hf`), attempts a real render, verifies the produced MP4, and reports honest status when the CLI is unavailable.
-- **Version**: synchronized version to `2.0.4` across README, root `package.json`, all workspace packages, `HADK_VERSION`, and the implementation report.
+- **Version**: synchronized version to `2.0.5` across README, root `package.json`, all workspace packages, `HADK_VERSION`, and the implementation report.
+- **Pipeline lifecycle**: scope budget, gate validation, phase advancement, and render lifecycle now use consistent runtime state and permit an end-to-end completion path.
+- **Input and recovery safety**: invalid configuration values and failed URL fetches are rejected; corrupt state can recover from `state.yaml.bak`; unmanaged local installer targets are protected.
 
 ### Added
 - **Idea import contract**: external agent results now have a documented schema, validated candidate fields, recalculated scores, and selected-candidate consistency checks.

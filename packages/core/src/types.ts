@@ -251,6 +251,7 @@ export interface CandidateIdea {
   fallbacks: string[];
   failure_modes: string[];
   score_breakdown: Record<string, number>;
+  score_breakdown_kind: 'raw' | 'weighted';
   total_score: number;
 }
 

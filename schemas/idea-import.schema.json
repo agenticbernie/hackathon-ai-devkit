@@ -17,7 +17,7 @@
   "$defs": {
     "candidate": {
       "type": "object",
-      "required": ["id", "name", "one_liner", "target_user", "problem", "solution", "core_mechanism", "strategy_mode_fit", "taste_fit", "rubric_fit", "sponsor_fit", "demo_flow", "wow_moment", "build_plan_summary", "estimated_hours", "critical_dependencies", "fallbacks", "failure_modes", "score_breakdown", "total_score"],
+      "required": ["id", "name", "one_liner", "target_user", "problem", "solution", "core_mechanism", "strategy_mode_fit", "taste_fit", "rubric_fit", "sponsor_fit", "demo_flow", "wow_moment", "build_plan_summary", "estimated_hours", "critical_dependencies", "fallbacks", "failure_modes", "score_breakdown", "score_breakdown_kind", "total_score"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "name": { "type": "string", "minLength": 1 },
@@ -39,6 +39,7 @@
         "fallbacks": { "type": "array", "items": { "type": "string" } },
         "failure_modes": { "type": "array", "items": { "type": "string" } },
         "score_breakdown": { "type": "object", "additionalProperties": { "type": "number", "minimum": 0, "maximum": 10 } },
+        "score_breakdown_kind": { "enum": ["raw", "weighted"] },
         "total_score": { "type": "number", "minimum": 0, "maximum": 10 }
       }
     },

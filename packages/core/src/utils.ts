@@ -103,6 +103,17 @@ export function hoursBetween(from: Date, to: Date): number {
   return Math.max(0, (to.getTime() - from.getTime()) / 3_600_000);
 }
 
+/** Resolve the authoritative time budget, preferring a valid absolute deadline. */
+export function remainingHours(deadline: string | null, configuredHours: number | null, now = new Date()): number | null {
+  if (deadline) {
+    const parsed = new Date(deadline);
+    if (!Number.isNaN(parsed.getTime())) return Math.round(hoursBetween(now, parsed) * 10) / 10;
+  }
+  return typeof configuredHours === 'number' && Number.isFinite(configuredHours) && configuredHours >= 0
+    ? configuredHours
+    : null;
+}
+
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }

@@ -18,7 +18,7 @@ import {
   ok,
   err,
   hadkError,
-  hoursBetween,
+  remainingHours,
   weightsSumToOne,
 } from '@hadk/core';
 import { StateStore } from '@hadk/state-store';
@@ -73,11 +73,8 @@ export class Orchestrator {
     return { mode, remaining_hours: remaining, ...policy };
   }
 
-  private computeRemainingHours(state: CompetitionState): number | null {
-    if (!state.competition.deadline) return state.competition.remaining_hours;
-    const deadline = new Date(state.competition.deadline);
-    if (isNaN(deadline.getTime())) return state.competition.remaining_hours;
-    return Math.round(hoursBetween(new Date(), deadline) * 10) / 10;
+  computeRemainingHours(state: CompetitionState): number | null {
+    return remainingHours(state.competition.deadline, state.competition.remaining_hours);
   }
 
   // ─── Gate Checks ───────────────────────────────────────────────────────
@@ -111,7 +108,7 @@ export class Orchestrator {
         if (!state.scope.primary_wow_moment) issues.push('No primary wow moment defined.');
         {
           const totalHours = state.scope.mvp_features.reduce((sum, f) => sum + f.estimated_hours, 0);
-          const available = state.competition.remaining_hours ?? 48;
+          const available = this.computeRemainingHours(state) ?? 48;
           if (totalHours > available) issues.push(`MVP estimate (${totalHours}h) exceeds available time (${available}h).`);
         }
         for (const dep of state.scope.external_dependencies) {
@@ -174,6 +171,8 @@ export class Orchestrator {
   }
 
   private resolveAction(state: CompetitionState, phase: Phase, allowed: string[]): NextAction {
+    const current = this.currentPhaseAction(state, phase, allowed);
+    if (current) return current;
     const phaseIdx = PHASES.indexOf(phase);
 
     // Walk from current phase forward to find the first actionable step
@@ -217,6 +216,22 @@ export class Orchestrator {
       blocked_by: [],
       deadline_mode: this.getDeadlineMode(state),
     };
+  }
+
+  private currentPhaseAction(state: CompetitionState, phase: Phase, allowed: string[]): NextAction | null {
+    const command = this.commandForPhase(phase);
+    const operation = this.operationForPhase(phase);
+    const deadline_mode = this.getDeadlineMode(state);
+    const blocked = operation !== null && !allowed.includes(operation);
+    const blockedBy = blocked ? [`deadline_policy:${deadline_mode}`] : [];
+    const fallback = blocked ? this.fallbackCommand(allowed) : command;
+
+    if (phase === 'setup') return { command: fallback, description: 'Initialize the harness before ingesting a competition.', phase, blocked_by: blockedBy, deadline_mode };
+    if (phase === 'strategy' && !state.strategy.scoring_profile) return { command: fallback, description: 'Choose a strategy mode before generating ideas.', phase, blocked_by: blockedBy, deadline_mode };
+    if (phase === 'judge') return { command: fallback, description: 'Prepare judge Q&A before submission.', phase, blocked_by: blockedBy, deadline_mode };
+    if (phase === 'build' && state.gates.build_gate !== 'passed') return { command: fallback, description: 'Validate the generated project before demo preparation.', phase, blocked_by: blockedBy, deadline_mode };
+    if (phase === 'video' && state.delivery.video_status === 'project_generated') return { command: 'hadk video render', description: 'Render and verify the generated video before judge preparation.', phase, blocked_by: [], deadline_mode };
+    return null;
   }
 
   private commandForPhase(phase: Phase): string {
