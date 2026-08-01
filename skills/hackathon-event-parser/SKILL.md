@@ -40,9 +40,9 @@ extract_mode: "full | tracks_only | criteria_only"  # optional, default: full
 
 ```yaml
 event_metadata:
-  name: "<event name>"
-  organizer: "<organizer name>"
-  url: "<canonical event URL>"
+  name: "<verified event name or 'unknown'>"
+  organizer: "<verified organizer or 'unknown'>"
+  url: "<exactly the user-provided URL>"
   submission_platform: "<Devpost | DoraHacks | Hackathon.com | other>"
   start_datetime: "<ISO 8601 or 'unknown'>"
   end_datetime: "<ISO 8601 or 'unknown'>"
@@ -108,6 +108,9 @@ next_skill: "hackathon-track-analyzer"
 6. Normalize duration to hours. If only start/end dates are given, compute `duration_hours`.
 7. Flag any required tool or API that conflicts with `team_skills` as a constraint.
 8. `next_skill` must always be set to `hackathon-track-analyzer` to enforce pipeline continuity.
+9. The worked example in `references/example-output.yaml` is FICTIONAL test-fixture data — schema shape only, never factual evidence. Never copy any example URL, event name, organizer, date, track, sponsor, prize, or criterion into a real output.
+10. When page retrieval fails, preserve the exact user-provided URL in `event_metadata.url`. Do not derive an event name or organizer from the URL slug unless explicitly labeled as unverified metadata.
+11. If source content is empty or inaccessible, every event-specific field must be `unknown`, `null`, or an empty array. Never reuse example values.
 
 ---
 
@@ -115,9 +118,9 @@ next_skill: "hackathon-track-analyzer"
 
 ```yaml
 event_metadata:
-  name: "<string>"
-  organizer: "<string>"
-  url: "<string>"
+  name: "<string — verified name or 'unknown'>"
+  organizer: "<string — verified organizer or 'unknown'>"
+  url: "<string — exactly the user-provided URL>"
   submission_platform: "<string>"
   start_datetime: "<ISO 8601 or 'unknown'>"
   end_datetime: "<ISO 8601 or 'unknown'>"
@@ -189,121 +192,46 @@ next_skill: "hackathon-track-analyzer"
 - `playbooks/36h-hackathon-playbook.md`
 - `playbooks/48h-hackathon-playbook.md`
 
+## Example
+
+A schema-only placeholder example is shown below. No real or fictional event values are embedded — every field must come from the fetched page or be `unknown` (see Rules 9–11).
+
 **Input:**
 ```yaml
-event_url: "https://globalaihealth.devpost.com"
-team_size: 3
-team_skills: ["Python", "FastAPI", "React", "OpenAI API"]
+event_url: "<USER_PROVIDED_EVENT_URL>"
+team_size: <number>
+team_skills:
+  - "<skill>"
 extract_mode: "full"
 ```
 
 **Output:**
 ```yaml
 event_metadata:
-  name: "Global AI Health Hackathon 2025"
-  organizer: "HealthTech Alliance"
-  url: "https://globalaihealth.devpost.com"
-  submission_platform: "Devpost"
-  start_datetime: "2025-09-12T09:00:00-05:00"
-  end_datetime: "2025-09-14T17:00:00-05:00"
-  duration_hours: 56
-  location: "virtual"
-  registration_deadline: "2025-09-11T23:59:00-05:00"
-  submission_deadline: "2025-09-14T15:00:00-05:00"
+  name: "<verified event name or 'unknown'>"
+  organizer: "<verified organizer or 'unknown'>"
+  url: "<exactly the user-provided URL>"
+  submission_platform: "<Devpost | DoraHacks | Hackathon.com | other | unknown>"
+  start_datetime: "<ISO 8601 or 'unknown'>"
+  end_datetime: "<ISO 8601 or 'unknown'>"
+  duration_hours: <number or null>
+  location: "<in-person | virtual | hybrid | unknown>"
+  registration_deadline: "<ISO 8601 or 'unknown'>"
+  submission_deadline: "<ISO 8601 or 'unknown'>"
 
-tracks:
-  - id: "track-mental-health"
-    name: "AI for Mental Health"
-    description: "Build AI-powered tools that improve mental health outcomes for young adults aged 18–30."
-    sponsor: "OpenAI"
-    prize: "$5,000 + OpenAI API credits"
-    required_tools:
-      - "OpenAI API"
-    eligibility_constraints:
-      - "Must use OpenAI API"
-      - "Solution must target ages 18–30"
-    feasibility_signal: "high"
+tracks: []
+judging_criteria: []
+sponsor_tools: []
+timeline: []
 
-  - id: "track-diagnostics"
-    name: "AI Diagnostics"
-    description: "Use AI to assist clinicians in early disease detection using medical imaging."
-    sponsor: "Nvidia"
-    prize: "$7,500 + Nvidia GPU credits"
-    required_tools:
-      - "Nvidia NIM"
-      - "Medical imaging dataset"
-    eligibility_constraints:
-      - "Must use a publicly available medical dataset"
-      - "Model must not make clinical claims"
-    feasibility_signal: "low"
+recommended_track: null
 
-judging_criteria:
-  - track_id: "track-mental-health"
-    axes:
-      - axis: "Innovation"
-        weight: "30%"
-        description: "Novel application of AI to mental health — beyond basic chatbots"
-      - axis: "Impact"
-        weight: "30%"
-        description: "Potential to reach underserved users; measurable outcomes"
-      - axis: "Technical Execution"
-        weight: "20%"
-        description: "Working demo; appropriate use of OpenAI API; code quality"
-      - axis: "Presentation"
-        weight: "20%"
-        description: "Clarity of pitch; demo quality; storytelling"
-    rubric_source: "verbatim"
-
-  - track_id: "track-diagnostics"
-    axes:
-      - axis: "Clinical Validity"
-        weight: "high"
-        description: "[INFERRED] Accuracy and safety of diagnostic suggestions"
-      - axis: "Technical Execution"
-        weight: "high"
-        description: "[INFERRED] Model performance; dataset usage; implementation quality"
-    rubric_source: "inferred"
-
-sponsor_tools:
-  - sponsor: "OpenAI"
-    tools:
-      - name: "GPT-4o API"
-        use_case: "Conversational AI, text generation, classification"
-        bonus_prize: true
-        docs_url: "https://platform.openai.com/docs"
-  - sponsor: "Nvidia"
-    tools:
-      - name: "Nvidia NIM"
-        use_case: "GPU-accelerated model inference for medical imaging models"
-        bonus_prize: true
-        docs_url: "https://developer.nvidia.com/nim"
-
-timeline:
-  - event: "Registration closes"
-    datetime: "2025-09-11T23:59:00-05:00"
-    notes: "Teams must register before hacking begins"
-  - event: "Hackathon start"
-    datetime: "2025-09-12T09:00:00-05:00"
-    notes: "Opening keynote; tracks announced"
-  - event: "Midpoint check-in"
-    datetime: "2025-09-13T12:00:00-05:00"
-    notes: "Optional mentor sessions available"
-  - event: "Submissions close"
-    datetime: "2025-09-14T15:00:00-05:00"
-    notes: "Devpost submission must be complete; late submissions not accepted"
-  - event: "Judging"
-    datetime: "2025-09-14T16:00:00-05:00"
-    notes: "3-minute pitch + 2-minute Q&A per team"
-
-recommended_track:
-  track_id: "track-mental-health"
-  track_name: "AI for Mental Health"
-  rationale: "Team has Python, FastAPI, React, and OpenAI API skills — all required tools are covered. Feasibility signal is high vs. low for diagnostics (which requires medical imaging expertise). Prize is competitive and judging rubric is fully published."
-
-extraction_confidence: "high"
+extraction_confidence: "<high | medium | low>"
 extraction_warnings:
-  - "Judging rubric for track-diagnostics was not published; criteria are inferred from track description"
-  - "Midpoint check-in schedule may change — verify on event Discord"
+  - "<any ambiguity, missing data, or access issues>"
 
 next_skill: "hackathon-track-analyzer"
+```
+
+> A fully worked (fictional) example lives in `references/example-output.yaml`. It is test-fixture data only — never treat it as source evidence.
 ```

@@ -1,0 +1,62 @@
+# FICTIONAL TEST FIXTURE DATA — NOT A REAL EVENT.
+#
+# This file demonstrates the output SHAPE only. Every value below is invented.
+# Never treat it as source evidence. Never copy these values into a real output.
+# Real outputs must be derived exclusively from the fetched event page.
+# All event-specific fields in a real output must be "unknown"/null/empty when
+# the source is empty or inaccessible (see SKILL.md Rules 9-11).
+
+event_metadata:
+  name: "Example Hackathon 2026"
+  organizer: "Example Organizer"
+  url: "https://example-hackathon.devpost.com"
+  submission_platform: "Devpost"
+  start_datetime: "2026-03-20T09:00:00-04:00"
+  end_datetime: "2026-03-22T17:00:00-04:00"
+  duration_hours: 56
+  location: "virtual"
+  registration_deadline: "2026-03-19T23:59:00-04:00"
+  submission_deadline: "2026-03-22T15:00:00-04:00"
+
+tracks:
+  - id: "track-example-a"
+    name: "Example Track A"
+    description: "Fictional track description for shape demonstration."
+    sponsor: null
+    prize: "$5,000"
+    required_tools:
+      - "Example API"
+    eligibility_constraints: []
+    feasibility_signal: "medium"
+
+judging_criteria:
+  - track_id: "global"
+    axes:
+      - axis: "Innovation"
+        weight: "high"
+        description: "Fictional axis description."
+    rubric_source: "inferred"
+
+sponsor_tools:
+  - sponsor: "Example Sponsor"
+    tools:
+      - name: "Example API"
+        use_case: "Fictional use case"
+        bonus_prize: false
+        docs_url: null
+
+timeline:
+  - event: "Submissions close"
+    datetime: "2026-03-22T15:00:00-04:00"
+    notes: null
+
+recommended_track:
+  track_id: "track-example-a"
+  track_name: "Example Track A"
+  rationale: "Fictional rationale."
+
+extraction_confidence: "medium"
+extraction_warnings:
+  - "This is fictional fixture data; do not copy it into a real output."
+
+next_skill: "hackathon-track-analyzer"
