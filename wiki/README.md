@@ -1,0 +1,32 @@
+# HADK Wiki
+
+HADK is an AI-native competition engineering harness. It turns a competition
+brief or startup thesis into structured artifacts, a scoped build, a reliable
+demo, and a submission package.
+
+Choose a workflow:
+
+- [Hackathon](hackathon/README.md): optimize for a working prototype, demo, and submission.
+- [Startup](startup/README.md): validate a painful problem before committing to a solution.
+
+## Quick distinction
+
+| Workflow | Primary question | First useful command |
+|---|---|---|
+| Hackathon | What can we build and demo reliably before the deadline? | `hadk ingest <brief>` |
+| Startup | Which painful problem is worth validating before we build? | `hadk startup research ...` |
+
+Both workflows use `.hackathon/` for atomic state and YAML artifacts. Run commands
+from the project directory where you want `.hackathon/` created.
+
+## Common commands
+
+```bash
+hadk setup
+hadk status
+hadk next
+hadk validate registry
+```
+
+The canonical skill registry is `manifest.yaml`. Skills and their JSON contracts
+are stored under `skills/` and `schemas/skills/`.

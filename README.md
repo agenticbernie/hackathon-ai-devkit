@@ -92,6 +92,10 @@ cd prototype && pnpm install && pnpm dev
 A full walkthrough lives in
 [docs/guides/first-hackathon.md](docs/guides/first-hackathon.md).
 
+For task-oriented user documentation, see the [HADK wiki](wiki/README.md),
+including separate [hackathon](wiki/hackathon/README.md) and
+[startup](wiki/startup/README.md) sections.
+
 ## 6. Three strategy modes
 
 `hadk strategy --mode <mode>` reweights idea scoring toward a winning
