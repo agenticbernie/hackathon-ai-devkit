@@ -103,8 +103,8 @@ describe('registry validation', () => {
   it('validates the real repository manifest', () => {
     const result = validateRegistry(repoRoot);
     expect(result.passed).toBe(true);
-    // Should register all 30 skills.
-    expect(result.issues.some((i) => i.code === 'REGISTRY_COUNT' && i.message.includes('30'))).toBe(true);
+    // Should register all skills, including the opportunity scorecard.
+    expect(result.issues.some((i) => i.code === 'REGISTRY_COUNT' && i.message.includes('35'))).toBe(true);
   });
 
   it('fails when the manifest is missing', () => {

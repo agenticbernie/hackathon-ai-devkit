@@ -68,6 +68,21 @@ export interface CompetitionState {
     scoring_profile: Record<string, number> | null;
   };
 
+  startup?: {
+    pain_point_research_status: GateStatus;
+    opportunity_scorecard_status: GateStatus;
+    selected_pain_point_id: string | null;
+    pain_point_deep_dive_status: GateStatus;
+    validation_plan_status: GateStatus;
+    customer_evidence_status: GateStatus;
+    hackathon_adapter_status: GateStatus;
+    latest_research_artifact?: string | null;
+    latest_scorecard_artifact?: string | null;
+    latest_deep_dive_artifact?: string | null;
+    latest_validation_plan_artifact?: string | null;
+    latest_agent_handoff_artifact?: string | null;
+  };
+
   scope: {
     status: 'unlocked' | 'locked';
     mvp_features: ScopeFeature[];

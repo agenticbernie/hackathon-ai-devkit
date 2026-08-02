@@ -5,6 +5,15 @@ All notable changes to the HADK (Hackathon AI DevKit) project are documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.7] - 2026-08-02
+
+### Added
+- Problem-first startup discovery with opportunity scorecards, source provenance, Claude Code/Codex research handoffs, startup status/next commands, and a Shoo venture fixture.
+- Deterministic URL/local-source handling with retrieval status, content hashes, warnings, and anti-fabrication safeguards.
+
+### Changed
+- Startup customer evidence now depends on the startup validation plan rather than the hackathon selected idea.
+
 ## [2.0.5] - 2026-07-28
 
 ### Fixed

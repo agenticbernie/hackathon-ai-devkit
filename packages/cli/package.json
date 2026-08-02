@@ -1,6 +1,6 @@
 {
   "name": "@hadk/cli",
-  "version": "2.0.6",
+  "version": "2.0.7",
   "description": "hadk — the AI-native Competition Engineering Harness CLI",
   "type": "module",
   "main": "dist/index.js",

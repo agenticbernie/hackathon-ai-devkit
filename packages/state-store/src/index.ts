@@ -58,6 +58,20 @@ export function createDefaultState(): CompetitionState {
       selected_idea: null,
       scoring_profile: null,
     },
+    startup: {
+      pain_point_research_status: 'pending',
+      opportunity_scorecard_status: 'pending',
+      selected_pain_point_id: null,
+      pain_point_deep_dive_status: 'pending',
+      validation_plan_status: 'pending',
+      customer_evidence_status: 'pending',
+      hackathon_adapter_status: 'pending',
+      latest_research_artifact: null,
+      latest_scorecard_artifact: null,
+      latest_deep_dive_artifact: null,
+      latest_validation_plan_artifact: null,
+      latest_agent_handoff_artifact: null,
+    },
     scope: {
       status: 'unlocked',
       mvp_features: [],
@@ -408,6 +422,25 @@ export function migrateState(raw: CompetitionState): MigrationResult {
       (state as unknown as Record<string, unknown>)[section] = defaults[section];
       changed = true;
     }
+  }
+
+  const startupDefaults = defaults.startup!;
+  if (!state.startup) {
+    state.startup = { ...startupDefaults };
+    changed = true;
+  } else {
+    if (state.startup.pain_point_research_status === undefined) { state.startup.pain_point_research_status = startupDefaults.pain_point_research_status; changed = true; }
+    if (state.startup.opportunity_scorecard_status === undefined) { state.startup.opportunity_scorecard_status = startupDefaults.opportunity_scorecard_status; changed = true; }
+    if (state.startup.selected_pain_point_id === undefined) { state.startup.selected_pain_point_id = startupDefaults.selected_pain_point_id; changed = true; }
+    if (state.startup.pain_point_deep_dive_status === undefined) { state.startup.pain_point_deep_dive_status = startupDefaults.pain_point_deep_dive_status; changed = true; }
+    if (state.startup.validation_plan_status === undefined) { state.startup.validation_plan_status = startupDefaults.validation_plan_status; changed = true; }
+    if (state.startup.customer_evidence_status === undefined) { state.startup.customer_evidence_status = startupDefaults.customer_evidence_status; changed = true; }
+    if (state.startup.hackathon_adapter_status === undefined) { state.startup.hackathon_adapter_status = startupDefaults.hackathon_adapter_status; changed = true; }
+    if (state.startup.latest_research_artifact === undefined) { state.startup.latest_research_artifact = null; changed = true; }
+    if (state.startup.latest_scorecard_artifact === undefined) { state.startup.latest_scorecard_artifact = null; changed = true; }
+    if (state.startup.latest_deep_dive_artifact === undefined) { state.startup.latest_deep_dive_artifact = null; changed = true; }
+    if (state.startup.latest_validation_plan_artifact === undefined) { state.startup.latest_validation_plan_artifact = null; changed = true; }
+    if (state.startup.latest_agent_handoff_artifact === undefined) { state.startup.latest_agent_handoff_artifact = null; changed = true; }
   }
 
   return { state, changed };

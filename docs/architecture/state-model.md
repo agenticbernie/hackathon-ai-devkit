@@ -19,7 +19,8 @@ delivery progress, so a session can always resume. See
 │   ├── scope/            #   scope.yaml
 │   ├── demo/             #   demo-checklist.yaml
 │   ├── pitch/            #   judge-prep.yaml
-│   └── submission/       #   submission.yaml
+│   ├── submission/       #   submission.yaml
+│   └── startup-discovery/ #   research, scorecard, deep dive, validation, handoffs
 ├── checkpoints/          # named state snapshots for rollback
 ├── logs/                 # append-only event log
 ├── context/              # gathered context for agents
@@ -35,6 +36,7 @@ delivery progress, so a session can always resume. See
 | `competition` | Name, type, source URL, tracks, judging criteria, sponsor requirements, deadline, remaining hours. |
 | `team` | Size and skills (drives taste inference). |
 | `strategy` | Mode, taste source, idea taste, scoring profile, selected track, selected idea. |
+| `startup` | Backward-compatible status, artifact pointers, selected pain point, scorecard, evidence, and handoff progress. |
 | `scope` | Status (`locked`/`unlocked`), MVP features, deferred features, demo flow, primary wow moment, external dependencies. |
 | `architecture` | Scaffold profile, status, feature mapping. |
 | `delivery` | Current phase, demo status, video status, submission status, autonomous mode. |
@@ -77,4 +79,6 @@ Artifacts are phase-keyed YAML outputs written via
 `store.writeArtifact(phase, name, data)` and read via
 `store.readArtifact(phase, name)`. Unlike `state.yaml`, artifacts are
 append-style deliverables (the full idea ranking, the locked scope contract,
-the judge prep, etc.) that the submission package references.
+the judge prep, etc.) that the submission package references. Startup discovery
+artifacts are independent of the hackathon `selected-idea` and follow
+`pain-point-research.yaml` → `opportunity-scorecard.yaml` → `pain-point-deep-dive.yaml` → `validation-plan.yaml`. Source provenance and agent handoffs are stored alongside these artifacts.

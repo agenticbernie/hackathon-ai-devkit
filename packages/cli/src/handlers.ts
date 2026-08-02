@@ -20,6 +20,7 @@ import {
   readYamlFile,
   weightsSumToOne,
   remainingHours,
+  writeYamlFileAtomic,
 } from '@hadk/core';
 import { StateStore } from '@hadk/state-store';
 import { Orchestrator, scoreIdea } from '@hadk/orchestrator';
@@ -27,7 +28,8 @@ import { validateRegistry } from '@hadk/validators';
 import { AgentAdapters } from '@hadk/agent-adapters';
 import Ajv from 'ajv';
 import { existsSync, readFileSync, accessSync, constants, statSync } from 'node:fs';
-import { join, delimiter, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { join, delimiter, resolve, basename, extname } from 'node:path';
 import { success, info, warn, fail } from './index.js';
 
 const ideaImportSchema = JSON.parse(
@@ -797,6 +799,458 @@ export async function cmdUpdate(): Promise<void> {
   info('To update HADK, re-run the installer:');
   info('  curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/main/install.sh | bash');
   info('The installer is idempotent and non-destructive.');
+}
+
+// ─── Startup discovery ───────────────────────────────────────────────────────
+
+const validationMethods = ['user_interview', 'expert_interview', 'survey', 'landing_page_test', 'fake_door_test', 'concierge_mvp', 'prototype_usability_test', 'pilot', 'pre_order', 'letter_of_intent', 'manual_workflow_experiment'] as const;
+
+function startupState(store: StateStore): void {
+  store.update((s) => {
+    s.startup ??= {
+      pain_point_research_status: 'pending', opportunity_scorecard_status: 'pending', selected_pain_point_id: null,
+      pain_point_deep_dive_status: 'pending', validation_plan_status: 'pending', customer_evidence_status: 'pending', hackathon_adapter_status: 'pending',
+    };
+  });
+}
+
+function writeOptionalOutput(path: string | undefined, data: unknown): boolean {
+  if (!path) return true;
+  const written = writeYamlFileAtomic(resolve(path), data);
+  if (!written.ok) {
+    fail(`Could not write --output: ${written.error.message}`);
+    return false;
+  }
+  return true;
+}
+
+function readStartupYaml<T>(path: string, label: string): T | null {
+  const result = readYamlFile<T>(path);
+  if (!result.ok) {
+    fail(`Could not read ${label}: ${result.error.message}`);
+    return null;
+  }
+  return result.value;
+}
+
+type StartupSource = {
+  source_id: string;
+  source: string;
+  source_type: 'local_markdown' | 'local_text' | 'local_yaml' | 'local_json' | 'public_url' | 'user_statement' | 'agent_observation';
+  retrieved_at: string;
+  content_hash: string | null;
+  retrieval_status: 'retrieved' | 'failed' | 'empty';
+  extraction_confidence: 'low' | 'medium' | 'high';
+  extraction_warnings: string[];
+  locator: string | null;
+  evidence_excerpt: string | null;
+};
+
+function sourceType(pathOrUrl: string): StartupSource['source_type'] {
+  if (/^https?:\/\//i.test(pathOrUrl)) return 'public_url';
+  const extension = extname(pathOrUrl).toLowerCase();
+  if (extension === '.md' || extension === '.markdown') return 'local_markdown';
+  if (extension === '.yaml' || extension === '.yml') return 'local_yaml';
+  if (extension === '.json') return 'local_json';
+  return 'local_text';
+}
+
+function hashContent(content: string): string {
+  return createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+function sourceList(opts: { source?: string | string[]; sourcesFile?: string }): string[] | null {
+  const values = opts.source ? (Array.isArray(opts.source) ? opts.source : [opts.source]) : [];
+  if (!opts.sourcesFile) return values;
+  const loaded = readStartupYaml<any>(resolve(opts.sourcesFile), 'sources file');
+  if (!loaded) return null;
+  const fromFile = Array.isArray(loaded) ? loaded : loaded.sources;
+  if (!Array.isArray(fromFile) || fromFile.some((source) => typeof source !== 'string')) {
+    fail('Sources file must contain a YAML/JSON array of source strings or `{ sources: [...] }`.');
+    return null;
+  }
+  return [...values, ...fromFile];
+}
+
+async function ingestStartupSource(source: string): Promise<StartupSource> {
+  const retrievedAt = nowIso();
+  const type = sourceType(source);
+  const base = { source_id: generateId('source'), source, source_type: type, retrieved_at: retrievedAt, locator: null } as const;
+  if (type === 'public_url') {
+    try {
+      const url = new URL(source);
+      const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      if (!response.ok) return { ...base, content_hash: null, retrieval_status: 'failed', extraction_confidence: 'low', extraction_warnings: [`HTTP ${response.status} ${response.statusText}`], evidence_excerpt: null };
+      const content = await response.text();
+      if (!content.trim()) return { ...base, content_hash: hashContent(content), retrieval_status: 'empty', extraction_confidence: 'low', extraction_warnings: ['URL returned an empty response.'], evidence_excerpt: null };
+      return { ...base, content_hash: hashContent(content), retrieval_status: 'retrieved', extraction_confidence: 'low', extraction_warnings: ['Content was retrieved but no claims were extracted by the deterministic handler.'], evidence_excerpt: content.slice(0, 500) };
+    } catch (error) {
+      return { ...base, content_hash: null, retrieval_status: 'failed', extraction_confidence: 'low', extraction_warnings: [`URL retrieval failed: ${(error as Error).message}`], evidence_excerpt: null };
+    }
+  }
+  if (basename(source).startsWith('.') || /\.env|credentials|secret/i.test(source)) {
+    return { ...base, content_hash: null, retrieval_status: 'failed', extraction_confidence: 'low', extraction_warnings: ['Potential secret-bearing file was not read.'], evidence_excerpt: null };
+  }
+  if (!existsSync(resolve(source))) return { ...base, content_hash: null, retrieval_status: 'failed', extraction_confidence: 'low', extraction_warnings: [`Local source file not found: ${source}`], evidence_excerpt: null };
+  try {
+    const content = readFileSync(resolve(source), 'utf8');
+    if (type === 'local_yaml' || type === 'local_json') {
+      const parsed = readYamlFile<unknown>(resolve(source));
+      if (!parsed.ok) return { ...base, content_hash: hashContent(content), retrieval_status: 'failed', extraction_confidence: 'low', extraction_warnings: [`Structured source could not be parsed: ${parsed.error.message}`], evidence_excerpt: null };
+    }
+    if (!content.trim()) return { ...base, content_hash: hashContent(content), retrieval_status: 'empty', extraction_confidence: 'low', extraction_warnings: ['Local source is empty.'], evidence_excerpt: null };
+    return { ...base, content_hash: hashContent(content), retrieval_status: 'retrieved', extraction_confidence: 'low', extraction_warnings: ['Content was read but no claims were extracted by the deterministic handler.'], evidence_excerpt: content.slice(0, 500) };
+  } catch (error) {
+    return { ...base, content_hash: null, retrieval_status: 'failed', extraction_confidence: 'low', extraction_warnings: [`Local source could not be read: ${(error as Error).message}`], evidence_excerpt: null };
+  }
+}
+
+function researchHandoffPrompt(agent: 'claude-code' | 'codex', state: CompetitionState, market: string, segments: string[], sources: string[], outputPath: string): string {
+  return [
+    `# HADK Startup Pain-Point Research Handoff — ${agent}`,
+    '',
+    '## Venture context',
+    `Market: ${market}`,
+    `Target segments: ${segments.join(', ')}`,
+    `Competition: ${state.competition.name ?? 'not specified'}`,
+    '',
+    '## Available sources',
+    ...(sources.length ? sources.map((source) => `- ${source}`) : ['- No external source supplied; record this as a research gap.']),
+    '',
+    '## Required contract',
+    'Read the available sources only within your tools and permissions. Return YAML matching `schemas/skills/startup-pain-point-research.output.schema.json`.',
+    `Save the result to ${outputPath}.`,
+    'Preserve provenance for every externally sourced claim: source identifier, source type, retrieval status, locator, and excerpt where safe.',
+    '',
+    '## Evidence rules',
+    '- Separate direct user evidence, secondary research, market signals, founder observations, inference, and hypothesis.',
+    '- Never fabricate interviews, quotes, statistics, citations, or customer evidence.',
+    '- Search for disconfirming evidence and state unresolved research gaps.',
+    '- Label confidence and extraction warnings. Failed or inaccessible sources are not validated evidence.',
+    '- Do not generate a product idea. Recommend a pain point for deep dive only.',
+    '',
+    '## Validation checklist',
+    '- Every pain point has evidence type, confidence, assumptions, research gaps, and provenance.',
+    '- All claims are traceable to a supplied source or explicitly labeled inference/hypothesis.',
+    '- The YAML parses and satisfies the input/output schema contract.',
+    `Next action after review: hadk startup scorecard --research-file ${outputPath}`,
+  ].join('\n');
+}
+
+export async function cmdStartupResearch(
+  store: StateStore,
+  opts: { market?: string; segments?: string; source?: string | string[]; sourcesFile?: string; agent?: string; output?: string; agentHandoff?: boolean },
+): Promise<void> {
+  ensureInitialized(store);
+  startupState(store);
+  const market = opts.market?.trim();
+  const segments = (opts.segments ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!market) return fail('--market is required.', 'Example: hadk startup research --market "clinic operations" --segments "practice managers,clinicians"');
+  if (segments.length === 0) return fail('--segments must contain at least one segment.');
+  const sources = sourceList(opts);
+  if (!sources) return;
+  const provenance = await Promise.all(sources.map((source) => ingestStartupSource(source)));
+  const failedSources = provenance.filter((source) => source.retrieval_status === 'failed');
+  if (failedSources.length) warn(`${failedSources.length} source(s) could not be retrieved; they are recorded as unavailable, not evidence.`);
+
+  const researchedAt = nowIso();
+  const painPoints = segments.map((segment, index) => ({
+    id: generateId('pain'), segment,
+    job_to_be_done: `Complete the highest-value workflow in ${market}.`,
+    situation: `The ${segment} segment encounters this workflow in normal operations.`,
+    pain: `The workflow may be slower, riskier, or more expensive than desired.`,
+    current_workaround: 'Unknown; document the existing workaround during interviews.',
+    consequence: 'Unknown; quantify time, cost, risk, and emotional impact during validation.',
+    frequency: 'Unknown', severity: 'Unknown', urgency: 'Unknown', economic_impact: 'Unknown',
+    evidence: [],
+    evidence_type: 'hypothesis' as const, confidence: 'low' as const,
+    assumptions: [`${segment} experiences a meaningful version of this workflow pain.`],
+    research_gaps: ['Direct user evidence', 'Frequency and severity measures', 'Current alternatives and spend'],
+    rank: index + 1,
+  }));
+  const artifact = {
+    schema_version: '1.0', research_id: generateId('research'), researched_at: researchedAt, market,
+    target_segments: segments,
+    observed_workflows: segments.map((segment) => ({ segment, job_to_be_done: `Complete the highest-value workflow in ${market}.`, steps: ['Trigger and context are unknown', 'Current workflow is unknown', 'Outcome and consequence are unknown'] })),
+    pain_points: painPoints, opportunity_areas: [`Unverified workflow improvements for ${market}`],
+    recommended_pain_point_id: painPoints[0].id, recommended_next_skill: 'startup-pain-point-deep-dive',
+    source_references: sources,
+    provenance,
+    generation: { mode: 'heuristic_fallback', agent_intent: opts.agent ?? null, claims_validated: false },
+  };
+  const written = store.writeArtifact('startup-discovery', 'pain-point-research.yaml', artifact);
+  if (!written.ok) return fail(written.error.message);
+  if (!writeOptionalOutput(opts.output, artifact)) return;
+  store.update((s) => { s.startup!.pain_point_research_status = 'passed'; s.startup!.selected_pain_point_id = artifact.recommended_pain_point_id; s.startup!.latest_research_artifact = written.value; });
+  success(`Pain-point research created for ${market} (${painPoints.length} candidate pain points).`);
+  info(`Artifact: ${written.value}`);
+  info('Confidence: low until source evidence is reviewed.');
+  info(`Next: hadk startup deep-dive ${artifact.recommended_pain_point_id}`);
+  if (opts.agentHandoff || opts.agent === 'claude-code' || opts.agent === 'codex') {
+    const agents: ('claude-code' | 'codex')[] = opts.agent === 'claude-code' ? ['claude-code'] : opts.agent === 'codex' ? ['codex'] : ['claude-code', 'codex'];
+    const stateResult = store.load();
+    if (!stateResult.ok) return fail(stateResult.error.message);
+    for (const agent of agents) {
+      const prompt = researchHandoffPrompt(agent, stateResult.value, market, segments, sources, written.value);
+      const handoff = store.writeTextArtifact('startup-discovery/agent-handoffs', `pain-point-research-${agent}.md`, prompt);
+      if (!handoff.ok) return fail(handoff.error.message);
+      store.update((s) => { s.startup!.latest_agent_handoff_artifact = handoff.value; });
+      info(`Agent handoff: ${handoff.value}`);
+    }
+  }
+}
+
+const scorecardDimensions = {
+  severity: 0.25,
+  frequency: 0.2,
+  urgency: 0.2,
+  buyer_access: 0.2,
+  willingness_to_pay: 0.15,
+};
+
+function evidenceStatus(painPoint: any): 'validated' | 'assumed' | 'hypothetical' {
+  if (painPoint.evidence_type === 'direct_user_evidence' || painPoint.evidence_type === 'secondary_research' || painPoint.evidence_type === 'market_signal') return 'validated';
+  if (painPoint.evidence_type === 'inference' || painPoint.evidence_type === 'founder_observation') return 'assumed';
+  return 'hypothetical';
+}
+
+function scoreDimension(painPoint: any, dimension: string): { score: number; rationale: string; evidence: string[]; confidence: 'low' | 'medium' | 'high'; evidence_status: 'validated' | 'assumed' | 'hypothetical' } {
+  const status = evidenceStatus(painPoint);
+  const value = String(painPoint[dimension] ?? '').toLowerCase();
+  const known = value && value !== 'unknown' && value !== 'tbd';
+  const score = known ? 3 : 1;
+  return {
+    score,
+    rationale: known ? `${dimension} is recorded in the research artifact but has not been independently scored.` : `${dimension} is missing or unknown; use the minimum provisional score until evidence is collected.`,
+    evidence: (painPoint.evidence ?? []).map((item: any) => item.source ?? item.claim).filter(Boolean),
+    confidence: known && status === 'validated' ? 'medium' : 'low',
+    evidence_status: status,
+  };
+}
+
+export async function cmdStartupScorecard(
+  store: StateStore,
+  opts: { researchFile?: string; deepDiveFile?: string; agent?: string },
+): Promise<void> {
+  ensureInitialized(store);
+  startupState(store);
+  const researchPath = resolve(opts.researchFile ?? store.artifactPath('startup-discovery', 'pain-point-research.yaml'));
+  const research = readStartupYaml<any>(researchPath, 'research artifact');
+  if (!research) return;
+  if (!Array.isArray(research.pain_points) || research.pain_points.length === 0) return fail('Research artifact contains no pain points.', 'Run `hadk startup research` with at least one target segment.');
+  const deepDive = opts.deepDiveFile ? readStartupYaml<any>(resolve(opts.deepDiveFile), 'deep-dive artifact') : null;
+  if (opts.deepDiveFile && !deepDive) return;
+  const dimensions = Object.fromEntries(Object.entries(scorecardDimensions).map(([name, weight]) => [name, { weight, scale: '1-5' }]));
+  const scores = research.pain_points.map((painPoint: any) => {
+    const dimensionScores = Object.fromEntries(Object.keys(scorecardDimensions).map((dimension) => [dimension, scoreDimension(painPoint, dimension)]));
+    const weightedScore = Object.entries(scorecardDimensions).reduce((total, [dimension, weight]) => total + (dimensionScores[dimension] as any).score * weight, 0);
+    const missingEvidence = painPoint.research_gaps ?? ['Direct user evidence', 'Buyer access and willingness-to-pay evidence'];
+    return {
+      pain_point_id: painPoint.id,
+      pain_point: painPoint.pain,
+      scores: dimensionScores,
+      weighted_score: Math.round(weightedScore * 100) / 100,
+      score_confidence: 'low',
+      key_risks: ['Numeric scores are provisional and can create false precision.', 'Buyer access and willingness to pay remain unverified.'],
+      missing_evidence: missingEvidence,
+      recommended_action: 'deep_dive',
+    };
+  }).sort((a: any, b: any) => b.weighted_score - a.weighted_score);
+  const ranking = scores.map((score: any, index: number) => ({ pain_point_id: score.pain_point_id, rank: index + 1, weighted_score: score.weighted_score, recommendation: score.recommended_action }));
+  const artifact = {
+    schema_version: '1.0', scorecard_id: generateId('scorecard'), created_at: nowIso(),
+    scoring_method: 'Transparent weighted 1-5 provisional score; scores are prioritization signals, not product-market-fit proof.',
+    dimensions, pain_point_scores: scores, ranking, recommended_pain_point_id: ranking[0].pain_point_id,
+    decision: 'Prioritize the top pain point for disconfirming deep dive while collecting the missing evidence listed for every score.',
+    next_skill: 'startup-pain-point-deep-dive',
+    provenance: research.provenance ?? [], source_deep_dive_id: deepDive?.deep_dive_id ?? null, generation: { mode: 'deterministic_scorecard', agent_intent: opts.agent ?? null },
+  };
+  const written = store.writeArtifact('startup-discovery', 'opportunity-scorecard.yaml', artifact);
+  if (!written.ok) return fail(written.error.message);
+  store.update((s) => { s.startup!.opportunity_scorecard_status = 'passed'; s.startup!.selected_pain_point_id = artifact.recommended_pain_point_id; s.startup!.latest_scorecard_artifact = written.value; });
+  success(`Opportunity scorecard ranked ${scores.length} pain points.`);
+  info(`Artifact: ${written.value}`);
+  info(`Recommended pain point: ${artifact.recommended_pain_point_id} (provisional, low confidence)`);
+  info(`Next: hadk startup deep-dive ${artifact.recommended_pain_point_id}`);
+}
+
+type StartupStatusReport = {
+  initialized: boolean;
+  phase: string;
+  research: { status: string; artifact: string | null; pain_points: number };
+  recommended_pain_point_id: string | null;
+  scorecard: { status: string; artifact: string | null };
+  deep_dive: { status: string; artifact: string | null };
+  validation_plan: { status: string; artifact: string | null };
+  customer_evidence: { status: string; artifact: string | null };
+  agent_handoff: { status: string; artifact: string | null };
+  blocking_issues: string[];
+  next_action: { command: string; reason: string };
+};
+
+function startupStatusReport(store: StateStore): StartupStatusReport {
+  if (!store.isInitialized()) return { initialized: false, phase: 'not_initialized', research: { status: 'pending', artifact: null, pain_points: 0 }, recommended_pain_point_id: null, scorecard: { status: 'pending', artifact: null }, deep_dive: { status: 'pending', artifact: null }, validation_plan: { status: 'pending', artifact: null }, customer_evidence: { status: 'pending', artifact: null }, agent_handoff: { status: 'pending', artifact: null }, blocking_issues: [], next_action: { command: 'hadk startup research --market <market> --segments <segments>', reason: 'Initialize startup discovery by creating a pain-point research artifact.' } };
+  const loaded = store.load();
+  if (!loaded.ok) return { initialized: true, phase: 'blocked', research: { status: 'failed', artifact: null, pain_points: 0 }, recommended_pain_point_id: null, scorecard: { status: 'blocked', artifact: null }, deep_dive: { status: 'blocked', artifact: null }, validation_plan: { status: 'blocked', artifact: null }, customer_evidence: { status: 'blocked', artifact: null }, agent_handoff: { status: 'blocked', artifact: null }, blocking_issues: [loaded.error.message], next_action: { command: 'hadk startup research', reason: 'State could not be loaded.' } };
+  const state = loaded.value;
+  const researchPath = store.artifactPath('startup-discovery', 'pain-point-research.yaml');
+  const scorecardPath = store.artifactPath('startup-discovery', 'opportunity-scorecard.yaml');
+  const deepDivePath = store.artifactPath('startup-discovery', 'pain-point-deep-dive.yaml');
+  const validationPath = store.artifactPath('startup-discovery', 'validation-plan.yaml');
+  const customerPaths = [store.artifactPath('startup-discovery', 'customer-evidence.yaml'), store.artifactPath('startup-validation', 'customer-evidence.yaml')];
+  const handoffDir = join(store.artifactsDir, 'startup-discovery', 'agent-handoffs');
+  const research = existsSync(researchPath) ? readStartupYaml<any>(researchPath, 'research artifact') : null;
+  const customerPath = customerPaths.find((path) => existsSync(path)) ?? null;
+  const customerEvidence = customerPath ? readStartupYaml<any>(customerPath, 'customer evidence artifact') : null;
+  const startup = state.startup ?? { pain_point_research_status: 'pending', opportunity_scorecard_status: 'pending', selected_pain_point_id: null, pain_point_deep_dive_status: 'pending', validation_plan_status: 'pending', customer_evidence_status: 'pending', hackathon_adapter_status: 'pending' };
+  const recommended = (existsSync(scorecardPath) ? readStartupYaml<any>(scorecardPath, 'scorecard artifact')?.recommended_pain_point_id : null) ?? startup.selected_pain_point_id ?? (research?.recommended_pain_point_id ?? null);
+  const status: StartupStatusReport = {
+    initialized: true, phase: customerPath && customerEvidence?.unresolved_assumptions?.length ? 'evidence-needs-validation' : customerPath ? 'customer-evidence' : existsSync(validationPath) ? 'validation-planned' : existsSync(deepDivePath) ? 'deep-dive-complete' : existsSync(scorecardPath) ? 'opportunity-scored' : existsSync(researchPath) ? 'research-complete' : 'not_started',
+    research: { status: existsSync(researchPath) ? 'completed' : 'pending', artifact: existsSync(researchPath) ? researchPath : null, pain_points: research?.pain_points?.length ?? 0 },
+    recommended_pain_point_id: recommended,
+    scorecard: { status: existsSync(scorecardPath) ? 'completed' : 'pending', artifact: existsSync(scorecardPath) ? scorecardPath : null },
+    deep_dive: { status: existsSync(deepDivePath) ? 'completed' : 'pending', artifact: existsSync(deepDivePath) ? deepDivePath : null },
+    validation_plan: { status: existsSync(validationPath) ? 'completed' : 'pending', artifact: existsSync(validationPath) ? validationPath : null },
+    customer_evidence: { status: customerPath ? 'completed' : 'pending', artifact: customerPath },
+    agent_handoff: { status: existsSync(handoffDir) ? 'completed' : 'pending', artifact: startup.latest_agent_handoff_artifact ?? null },
+    blocking_issues: [
+      ...(!existsSync(researchPath) ? ['Pain-point research artifact is missing.'] : []),
+      ...(existsSync(researchPath) && !existsSync(scorecardPath) ? ['Opportunity scorecard is missing.'] : []),
+      ...(existsSync(scorecardPath) && !existsSync(deepDivePath) ? ['Pain-point deep dive is missing.'] : []),
+      ...(existsSync(deepDivePath) && !existsSync(validationPath) ? ['Validation plan is missing.'] : []),
+    ],
+    next_action: { command: 'hadk startup research', reason: 'No research artifact exists.' },
+  };
+  status.next_action = startupNextAction(status);
+  return status;
+}
+
+function startupNextAction(status: StartupStatusReport): { command: string; reason: string } {
+  if (!status.initialized || status.research.status !== 'completed') return { command: 'hadk startup research --market <market> --segments <segments>', reason: 'Research is the blocking dependency.' };
+  if (status.scorecard.status !== 'completed') return { command: 'hadk startup scorecard', reason: 'Research exists but pain points have not been ranked transparently.' };
+  if (status.deep_dive.status !== 'completed') return { command: `hadk startup deep-dive ${status.recommended_pain_point_id ?? '<pain-point-id>'}`, reason: 'The top-ranked pain point needs disconfirming deep dive.' };
+  if (status.validation_plan.status !== 'completed') return { command: 'hadk startup validate', reason: 'Deep dive exists but no falsifiable validation plan exists.' };
+  if (status.customer_evidence.status !== 'completed') return { command: 'agent-handoff: startup-customer-evidence', reason: 'Collect direct customer evidence from the validation plan; this is an agent/manual action, not a built-in CLI command.' };
+  if (status.phase === 'evidence-needs-validation') return { command: 'agent-handoff: startup additional validation', reason: 'Customer evidence contains unresolved assumptions; run additional falsifiable tests before solution hypotheses.' };
+  return { command: 'agent-handoff: startup solution hypothesis', reason: 'Startup discovery is complete; generate solution hypotheses from validated pain points.' };
+}
+
+export async function cmdStartupStatus(store: StateStore, opts: { json?: boolean }): Promise<void> {
+  const report = startupStatusReport(store);
+  if (opts.json) { console.log(JSON.stringify(report, null, 2)); return; }
+  console.log('Startup discovery status');
+  console.log(`Initialized: ${report.initialized ? 'yes' : 'no'}`);
+  console.log(`Phase: ${report.phase}`);
+  console.log(`Research: ${report.research.status}`);
+  console.log(`Pain points: ${report.research.pain_points}`);
+  console.log(`Recommended pain point: ${report.recommended_pain_point_id ?? '(none)'}`);
+  console.log(`Scorecard: ${report.scorecard.status}`);
+  console.log(`Deep dive: ${report.deep_dive.status}`);
+  console.log(`Validation plan: ${report.validation_plan.status}`);
+  console.log(`Customer evidence: ${report.customer_evidence.status}`);
+  console.log(`Agent handoff: ${report.agent_handoff.status}`);
+  console.log('');
+  console.log('Next:');
+  console.log(`  ${report.next_action.command}`);
+  info(report.next_action.reason);
+}
+
+export async function cmdStartupNext(store: StateStore): Promise<void> {
+  const report = startupStatusReport(store);
+  console.log(report.next_action.command);
+  info(report.next_action.reason);
+}
+
+export async function cmdStartupDeepDive(
+  store: StateStore,
+  painPointId: string,
+  opts: { researchFile?: string; painPointFile?: string; agent?: string },
+): Promise<void> {
+  ensureInitialized(store);
+  startupState(store);
+  const defaultPath = store.artifactPath('startup-discovery', 'pain-point-research.yaml');
+  const researchPath = resolve(opts.researchFile ?? defaultPath);
+  const research = readStartupYaml<any>(researchPath, 'research artifact');
+  if (!research) return;
+  const painPoint = opts.painPointFile ? readStartupYaml<any>(resolve(opts.painPointFile), 'pain-point file') : research.pain_points?.find((p: any) => p.id === painPointId);
+  if (!painPoint) return fail(`Unknown pain point "${painPointId}".`, `Choose one of: ${(research.pain_points ?? []).map((p: any) => p.id).join(', ') || 'none'}`);
+  if (painPoint.id !== painPointId) return fail(`Pain-point file does not contain requested id "${painPointId}".`);
+  const artifact = {
+    schema_version: '1.0', deep_dive_id: generateId('deep-dive'), created_at: nowIso(), pain_point_id: painPointId,
+    pain_point: painPoint.pain, primary_segment: painPoint.segment, user: painPoint.segment, buyer: 'Unknown; validate separately', decision_maker: 'Unknown; validate separately',
+    trigger: painPoint.situation, current_workflow: ['Unknown; observe the workflow directly'], current_workarounds: [painPoint.current_workaround],
+    consequences: { time: 'Unknown', cost: 'Unknown', risk: 'Unknown', emotional: 'Unknown', operational: painPoint.consequence },
+    frequency: painPoint.frequency, severity: painPoint.severity, urgency: painPoint.urgency, switching_barriers: ['Unknown; ask what prevents changing the current workaround'],
+    alternatives: ['Current workaround', 'Unknown alternatives; discover during interviews'], willingness_to_pay_signals: ['No willingness-to-pay evidence captured'],
+    supporting_evidence: painPoint.evidence ?? [], disconfirming_evidence: [{ claim: 'The pain may not be important enough to change behavior.', source: 'Required validation question; no disconfirming evidence collected yet.' }],
+    assumptions: [...(painPoint.assumptions ?? []), 'A user, buyer, and decision maker may be different people.'],
+    validation_questions: ['Tell me about the last time this happened.', 'What do you do today instead?', 'What does this cost in time, money, or risk?', 'When is this problem not important?', 'What would make you switch or pay?'],
+    pain_point_verdict: 'insufficient_evidence' as const, confidence: 'low' as const, recommended_next_action: 'Run startup-validation-plan and collect direct user evidence.',
+    provenance: { generation_mode: 'heuristic_fallback', agent_intent: opts.agent ?? null },
+  };
+  const written = store.writeArtifact('startup-discovery', 'pain-point-deep-dive.yaml', artifact);
+  if (!written.ok) return fail(written.error.message);
+  store.update((s) => { s.startup!.pain_point_deep_dive_status = 'passed'; s.startup!.selected_pain_point_id = painPointId; s.startup!.latest_deep_dive_artifact = written.value; });
+  success(`Pain-point deep dive created for ${painPointId}.`);
+  info(`Artifact: ${written.value}`);
+  info('Verdict: insufficient_evidence. No product recommendation was made.');
+  info('Next: hadk startup validate');
+}
+
+export async function cmdStartupValidate(
+  store: StateStore,
+  opts: { deepDiveFile?: string; methods?: string; timelineDays?: string; agent?: string },
+): Promise<void> {
+  ensureInitialized(store);
+  startupState(store);
+  const deepDive = readStartupYaml<any>(resolve(opts.deepDiveFile ?? store.artifactPath('startup-discovery', 'pain-point-deep-dive.yaml')), 'deep-dive artifact');
+  if (!deepDive) return;
+  const methods = (opts.methods ?? 'user_interview,manual_workflow_experiment').split(',').map((m) => m.trim()).filter(Boolean);
+  const invalid = methods.filter((m) => !(validationMethods as readonly string[]).includes(m));
+  if (invalid.length) return fail(`Invalid validation method(s): ${invalid.join(', ')}.`, `Allowed: ${validationMethods.join(', ')}`);
+  const timelineDays = Number(opts.timelineDays ?? '7');
+  if (!Number.isInteger(timelineDays) || timelineDays < 1) return fail('--timeline-days must be a positive integer.');
+  const hypotheses = [
+    { id: generateId('hypothesis'), statement: 'The target user experiences this pain frequently enough to seek change.', category: 'frequency' as const, importance: 'critical' as const, current_confidence: 'low' as const, validation_method: methods[0] as typeof validationMethods[number], target_participants: deepDive.primary_segment, sample_size: 5, interview_or_test_questions: deepDive.validation_questions ?? [], success_threshold: 'At least 3 of 5 participants describe a recent recurring instance.', falsification_threshold: 'Fewer than 2 participants describe a recent instance or workaround.', timeline: `${timelineDays} days`, owner: 'founder', evidence_to_capture: 'Dated interview notes with source references and observed behavior.', status: 'planned' as const, next_decision: 'Continue if threshold passes; revise or stop if falsified.' },
+    { id: generateId('hypothesis'), statement: 'The consequences are severe enough to justify changing the current workaround.', category: 'severity' as const, importance: 'high' as const, current_confidence: 'low' as const, validation_method: (methods[1] ?? methods[0]) as typeof validationMethods[number], target_participants: deepDive.primary_segment, sample_size: 5, interview_or_test_questions: ['What happens when this problem is not solved?', 'What have you already tried?'], success_threshold: 'At least 3 of 5 participants report a material time, cost, risk, or operational consequence.', falsification_threshold: 'Most participants report negligible consequences and no motivation to change.', timeline: `${timelineDays} days`, owner: 'founder', evidence_to_capture: 'Specific consequence examples and existing spend/workaround effort.', status: 'planned' as const, next_decision: 'Prioritize customer evidence only if material consequences are observed.' },
+  ];
+  const artifact = { schema_version: '1.0', validation_plan_id: generateId('validation'), created_at: nowIso(), source_pain_point_id: deepDive.pain_point_id, hypotheses, sequence: hypotheses.map((h) => h.id), decision_rules: ['Do not call the pain validated without direct evidence.', 'Stop or revise when a falsification threshold is met.', 'Advance to customer evidence only after the problem thresholds are met.'], expected_outcomes: ['Evidence-backed pain assessment', 'Explicit disconfirmation or revised assumptions'], recommended_next_skill: 'startup-customer-evidence', provenance: { generation_mode: 'heuristic_fallback', agent_intent: opts.agent ?? null } };
+  const written = store.writeArtifact('startup-discovery', 'validation-plan.yaml', artifact);
+  if (!written.ok) return fail(written.error.message);
+  store.update((s) => { s.startup!.validation_plan_status = 'passed'; s.startup!.latest_validation_plan_artifact = written.value; });
+  success(`Validation plan created with ${hypotheses.length} falsifiable hypotheses.`);
+  info(`Artifact: ${written.value}`);
+  info('Next: startup-customer-evidence (collect evidence; the plan itself is not validation).');
+}
+
+export async function cmdStartupAdaptHackathon(
+  store: StateStore,
+  opts: { profile?: string; sourceSkills?: string; agent?: string },
+): Promise<void> {
+  ensureInitialized(store);
+  startupState(store);
+  const profile = opts.profile ?? 'startup';
+  if (profile !== 'startup' && profile !== 'startup-contest') return fail('--profile must be startup or startup-contest.');
+  const mappings = [
+    ['hackathon-problem-space', 'startup-pain-point-research', 'adapt', 'Replace broad track framing with evidence-aware pain research.'],
+    ['hackathon-idea-strategy', 'startup venture strategy', 'adapt', 'Move strategy after problem evidence and add market, buyer, and evidence constraints.'],
+    ['hackathon-idea-generator', 'startup solution hypothesis generation', 'adapt', 'Generate solution hypotheses only after a pain point, not as validated products.'],
+    ['hackathon-idea-scoring', 'startup opportunity scoring', 'adapt', 'Score evidence strength, urgency, willingness to pay, and access instead of demo appeal alone.'],
+    ['hackathon-scope-cutter', 'startup MVP or experiment scope', 'adapt', 'Turn demo scope into learning and validation scope.'],
+    ['hackathon-wow-detector', 'startup value-proof detector', 'adapt', 'Turn the wow moment into proof of value.'],
+    ['hackathon-risk-analyzer', 'startup market/adoption/distribution risk', 'adapt', 'Include market and adoption risks, not only technical risks.'],
+    ['hackathon-task-planner', 'startup experiment roadmap', 'adapt', 'Sequence experiments by risk and learning value.'],
+    ['hackathon-deployment-prep', 'startup pilot readiness', 'adapt', 'Prepare a reliable pilot rather than only a demo deployment.'],
+    ['hackathon-judge-simulator', 'investor/customer diligence', 'adapt', 'Test claims with investor and customer objections.'],
+  ] as const;
+  const artifact = { schema_version: '1.0', adapter_id: generateId('adapter'), created_at: nowIso(), source_profile: opts.sourceSkills ?? 'existing hackathon skills', target_profile: 'startup', mappings: mappings.map(([source_skill, target_skill, action, rationale]) => ({ source_skill, target_skill, action, rationale, dependency_changes: ['Remove selected-idea as a prerequisite for problem discovery.'], evaluation_changes: ['Prefer evidence, learning velocity, adoption, and proof of value over novelty alone.'], output_changes: ['Add provenance, assumptions, disconfirming evidence, and next decision.'] })), workflow: { ordered_steps: [{ step: 1, skill: 'startup-pain-point-research', purpose: 'Map evidence-aware pains before ideation.', depends_on: [] }, { step: 2, skill: 'startup-pain-point-deep-dive', purpose: 'Investigate one pain and seek disconfirmation.', depends_on: ['startup-pain-point-research'] }, { step: 3, skill: 'startup-validation-plan', purpose: 'Plan falsifiable tests.', depends_on: ['startup-pain-point-deep-dive'] }, { step: 4, skill: 'startup-customer-evidence', purpose: 'Collect direct customer evidence.', depends_on: ['startup-validation-plan'] }], parallel_steps: ['startup-market-sizing', 'startup-competitor-mapper'] }, skills_to_reuse: ['hackathon-task-planner'], skills_to_adapt: mappings.map((m) => m[0]), skills_to_avoid: ['hackathon-idea-scoring as the first startup decision'], recommended_new_skills: ['startup-pain-point-research', 'startup-pain-point-deep-dive', 'startup-validation-plan'], migration_risks: ['Idea-first habits can cause premature solution commitment.', 'Demo metrics can be mistaken for customer validation.', 'Inferred market claims may be presented as direct evidence.'], recommended_commands: ['hadk startup research --market <market> --segments <segments>', 'hadk startup deep-dive <pain-point-id>', 'hadk startup validate', 'hadk startup adapt-hackathon'], provenance: { generation_mode: 'deterministic_mapping', agent_intent: opts.agent ?? null } };
+  const written = store.writeArtifact('startup-discovery', 'hackathon-adapter.yaml', artifact);
+  if (!written.ok) return fail(written.error.message);
+  store.update((s) => { s.startup!.hackathon_adapter_status = 'passed'; });
+  success(`Hackathon-to-startup adapter created for ${profile}.`);
+  info(`Artifact: ${written.value}`);
+  info('Startup principle: problem-first; wow becomes proof of value; demo scope becomes learning scope.');
+  info('Next: hadk startup research --market <market> --segments <segments>');
 }
 
 // ─── Heuristic Generators ────────────────────────────────────────────────────

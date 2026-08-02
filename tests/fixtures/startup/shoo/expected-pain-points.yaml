@@ -1,0 +1,19 @@
+schema_version: "1.0"
+venture: Shoo
+evidence_status: founder_observation_and_hypothesis
+pain_points:
+  - id: shoo-pp-001
+    statement: Small teams lose track of important follow-ups after interruptions.
+    evidence_type: hypothesis
+    confidence: low
+    research_gaps: [frequency, severity, current_workaround, buyer_access]
+  - id: shoo-pp-002
+    statement: Founders reconstruct context across chat and task tools.
+    evidence_type: hypothesis
+    confidence: low
+    research_gaps: [time_cost, alternatives, willingness_to_pay]
+  - id: shoo-pp-003
+    statement: Team leads cannot see when interruptions become delivery risk.
+    evidence_type: hypothesis
+    confidence: low
+    research_gaps: [urgency, economic_impact, decision_maker]

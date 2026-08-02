@@ -106,8 +106,8 @@ skills:
     path: skills/hackathon-scope-cutter
     input_schema: schemas/skills/hackathon-scope-cutter.input.schema.json
     output_schema: schemas/skills/hackathon-scope-cutter.output.schema.json
-    dependencies: [hackathon-idea-scoring]
-    optional_dependencies: []
+    dependencies: [startup-validation-plan]
+    optional_dependencies: [hackathon-idea-scoring]
     produces: [scope]
     consumes: [selected-idea, competition]
     supported_agents: [claude-code, codex, opencode]
@@ -299,6 +299,76 @@ skills:
     supported_agents: [claude-code, codex, opencode]
 
   # ── Startup Contest Extensions (beta) ─────────────────────────────────────
+  startup-pain-point-research:
+    version: "0.1.0"
+    phase: startup-discovery
+    status: beta
+    description: "Research a market and map evidence-aware pain-point opportunities before solution ideation."
+    path: skills/startup-pain-point-research
+    input_schema: schemas/skills/startup-pain-point-research.input.schema.json
+    output_schema: schemas/skills/startup-pain-point-research.output.schema.json
+    dependencies: []
+    optional_dependencies: []
+    produces: [pain-point-research]
+    consumes: [market, target-segments]
+    supported_agents: [claude-code, codex, opencode]
+
+  startup-pain-point-deep-dive:
+    version: "0.1.0"
+    phase: startup-discovery
+    status: beta
+    description: "Investigate one pain point, including disconfirming evidence, before deciding whether to validate it."
+    path: skills/startup-pain-point-deep-dive
+    input_schema: schemas/skills/startup-pain-point-deep-dive.input.schema.json
+    output_schema: schemas/skills/startup-pain-point-deep-dive.output.schema.json
+    dependencies: [startup-opportunity-scorecard]
+    optional_dependencies: []
+    produces: [pain-point-deep-dive]
+    consumes: [pain-point-research]
+    supported_agents: [claude-code, codex, opencode]
+
+  startup-opportunity-scorecard:
+    version: "0.1.0"
+    phase: startup-discovery
+    status: beta
+    description: "Rank pain points by transparent, evidence-aware startup opportunity quality."
+    path: skills/startup-opportunity-scorecard
+    input_schema: schemas/skills/startup-opportunity-scorecard.input.schema.json
+    output_schema: schemas/skills/startup-opportunity-scorecard.output.schema.json
+    dependencies: [startup-pain-point-research]
+    optional_dependencies: []
+    produces: [opportunity-scorecard]
+    consumes: [pain-point-research]
+    supported_agents: [claude-code, codex, opencode]
+
+  startup-validation-plan:
+    version: "0.1.0"
+    phase: startup-discovery
+    status: beta
+    description: "Convert uncertain startup assumptions into a prioritized, falsifiable validation plan."
+    path: skills/startup-validation-plan
+    input_schema: schemas/skills/startup-validation-plan.input.schema.json
+    output_schema: schemas/skills/startup-validation-plan.output.schema.json
+    dependencies: [startup-pain-point-deep-dive]
+    optional_dependencies: []
+    produces: [validation-plan]
+    consumes: [pain-point-deep-dive]
+    supported_agents: [claude-code, codex, opencode]
+
+  startup-hackathon-adapter:
+    version: "0.1.0"
+    phase: startup-discovery
+    status: beta
+    description: "Adapt hackathon skills and evaluation logic into a problem-first startup workflow."
+    path: skills/startup-hackathon-adapter
+    input_schema: schemas/skills/startup-hackathon-adapter.input.schema.json
+    output_schema: schemas/skills/startup-hackathon-adapter.output.schema.json
+    dependencies: []
+    optional_dependencies: [hackathon-problem-space, hackathon-idea-strategy, hackathon-idea-generator, hackathon-idea-scoring, hackathon-scope-cutter, hackathon-wow-detector, hackathon-risk-analyzer, hackathon-task-planner, hackathon-deployment-prep, hackathon-judge-simulator]
+    produces: [hackathon-adapter]
+    consumes: [hackathon-skills]
+    supported_agents: [claude-code, codex, opencode]
+
   startup-customer-evidence:
     version: "0.1.0"
     phase: startup-validation
@@ -307,10 +377,10 @@ skills:
     path: skills/startup-customer-evidence
     input_schema: schemas/skills/startup-customer-evidence.input.schema.json
     output_schema: schemas/skills/startup-customer-evidence.output.schema.json
-    dependencies: [hackathon-idea-scoring]
-    optional_dependencies: []
+    dependencies: [startup-validation-plan]
+    optional_dependencies: [hackathon-idea-scoring]
     produces: [customer-evidence]
-    consumes: [selected-idea]
+    consumes: [validation-plan, pain-point-deep-dive]
     supported_agents: [claude-code, codex, opencode]
 
   startup-market-sizing:

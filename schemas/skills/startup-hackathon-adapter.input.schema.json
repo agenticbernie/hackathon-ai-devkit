@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/startup-hackathon-adapter.input.schema.json",
+  "title": "Startup Hackathon Adapter Input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {"source_profile": {"type": "string"}, "source_skills": {"type": "array", "items": {"type": "string"}}, "target_profile": {"const": "startup"}, "agent": {"type": "string"}}
+}

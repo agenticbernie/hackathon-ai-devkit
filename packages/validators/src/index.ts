@@ -17,7 +17,7 @@ import {
   remainingHours,
 } from '@hadk/core';
 import { StateStore } from '@hadk/state-store';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ─── Issue Helpers ───────────────────────────────────────────────────────────
@@ -95,11 +95,35 @@ export function validateRegistry(hadkRoot: string): ValidationResult {
     // Schemas exist (when declared)
     if (entry.input_schema && !existsSync(join(hadkRoot, entry.input_schema))) {
       issues.push(warning('INPUT_SCHEMA_MISSING', `Skill "${name}" input schema missing: ${entry.input_schema}`));
+    } else if (entry.input_schema) {
+      try { JSON.parse(readFileSync(join(hadkRoot, entry.input_schema), 'utf-8')); }
+      catch { issues.push(error('INPUT_SCHEMA_INVALID', `Skill "${name}" input schema is not valid JSON.`, entry.input_schema)); }
     }
     if (entry.output_schema && !existsSync(join(hadkRoot, entry.output_schema))) {
       issues.push(warning('OUTPUT_SCHEMA_MISSING', `Skill "${name}" output schema missing: ${entry.output_schema}`));
+    } else if (entry.output_schema) {
+      try { JSON.parse(readFileSync(join(hadkRoot, entry.output_schema), 'utf-8')); }
+      catch { issues.push(error('OUTPUT_SCHEMA_INVALID', `Skill "${name}" output schema is not valid JSON.`, entry.output_schema)); }
     }
   }
+
+  // Required dependency graph must remain acyclic. Optional edges do not gate execution.
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (name: string, path: string[]): void => {
+    if (visiting.has(name)) {
+      issues.push(error('DEP_CYCLE', `Required dependency cycle detected: ${[...path, name].join(' → ')}`));
+      return;
+    }
+    if (visited.has(name)) return;
+    visiting.add(name);
+    for (const dep of manifest.skills[name]?.dependencies ?? []) {
+      if (registered.has(dep)) visit(dep, [...path, name]);
+    }
+    visiting.delete(name);
+    visited.add(name);
+  };
+  for (const name of skillNames) visit(name, []);
 
   // Orphan detection: skill dirs not in manifest
   const skillsDir = join(hadkRoot, 'skills');

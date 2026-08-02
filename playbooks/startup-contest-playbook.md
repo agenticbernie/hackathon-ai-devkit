@@ -11,6 +11,33 @@ Startup contests share the core harness flow (ingest → strategy → idea → s
 scaffold → build → demo → video → submit) but extend it with business-validation work.
 Judges evaluate the *venture*, not just the prototype.
 
+## Problem-first discovery
+
+Use the startup discovery layer before committing to a solution:
+
+```text
+Research source → Pain-point research → Opportunity scorecard → Deep dive → Validation plan → Customer evidence
+```
+
+```bash
+hadk startup research --market "workflow automation" --segments "operations leads,analysts"
+hadk startup scorecard
+hadk startup deep-dive <pain-point-id>
+hadk startup validate --methods user_interview,manual_workflow_experiment
+hadk startup status
+hadk startup next
+```
+
+Artifacts are written under `.hackathon/artifacts/startup-discovery/`. Research maps
+candidate pains and source provenance; the scorecard ranks opportunity quality using
+transparent 1–5 provisional scores; a deep dive tests one pain and seeks disconfirmation;
+customer evidence records actual observations. None of these steps generates or validates
+a product idea automatically.
+
+`startup status` summarizes persisted artifacts. `startup next` returns only the next
+valid action, and labels actions that require an agent or manual customer work as such.
+For a real venture fixture, see `tests/fixtures/startup/shoo/`.
+
 ---
 
 ## How startup-contest differs from hackathon
@@ -38,6 +65,10 @@ registered in `manifest.yaml` and are all labeled `status: beta`.
 3. `hadk idea` — generate and select one idea.
 4. `hadk scope` — lock an MVP whose demo illustrates the core value loop.
 5. `hadk scaffold` — generate the prototype.
+
+For a problem-first startup workflow, run the discovery commands before `hadk idea`.
+Solution ideation is downstream of pain evidence, while startup-contest execution adds
+market sizing, business model, pricing, GTM, pilot, and diligence work.
 
 ### Stage 2 — Business validation (startup extension)
 Work these in parallel with the build. Each maps to a registered skill:

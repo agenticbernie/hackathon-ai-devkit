@@ -1,0 +1,9 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/startup-validation-plan.input.schema.json",
+  "title": "Startup Validation Plan Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["deep_dive_artifact"],
+  "properties": {"deep_dive_artifact": {"type": "string", "minLength": 1}, "methods": {"type": "array", "items": {"type": "string"}}, "timeline_days": {"type": "integer", "minimum": 1}, "agent": {"type": "string"}}
+}

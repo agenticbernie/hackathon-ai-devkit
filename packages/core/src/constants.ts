@@ -5,7 +5,7 @@
 import type { DeadlineMode, Phase, StrategyMode } from './types.js';
 
 export const SCHEMA_VERSION = '1.0';
-export const HADK_VERSION = '2.0.5';
+export const HADK_VERSION = '2.0.7';
 export const STATE_DIR = '.hackathon';
 export const STATE_FILE = 'state.yaml';
 export const CONFIG_FILE = 'config.yaml';
@@ -159,4 +159,5 @@ export const ARTIFACT_DIRS = [
   'demo',
   'pitch',
   'submission',
+  'startup-discovery',
 ] as const;

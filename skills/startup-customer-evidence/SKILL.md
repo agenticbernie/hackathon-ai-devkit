@@ -15,13 +15,14 @@ Produce verifiable customer evidence that the problem is real and painful enough
 a company, rather than a solution looking for a problem.
 
 ## Trigger Conditions
-- `competition.type` is `startup-contest`.
-- A selected idea exists and the team is preparing the business narrative.
+- A startup validation plan exists.
+- The team is collecting evidence for a selected pain point, before or alongside solution ideation.
 
 ## Inputs
 | Input | Type | Required | Description |
 |---|---|---|---|
-| `selected_idea` | object | Yes | The locked idea |
+| `validation_plan` | object | Yes | The falsifiable validation plan |
+| `pain_point_deep_dive` | object | Yes | The selected pain point and open assumptions |
 | `target_user` | string | Yes | Primary customer segment |
 | `evidence_sources` | string[] | No | Interviews, surveys, waitlist, analytics |
 

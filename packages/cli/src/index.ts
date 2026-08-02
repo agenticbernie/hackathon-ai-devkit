@@ -46,6 +46,13 @@ import {
   cmdSubmit,
   cmdDoctor,
   cmdUpdate,
+  cmdStartupResearch,
+  cmdStartupScorecard,
+  cmdStartupDeepDive,
+  cmdStartupValidate,
+  cmdStartupAdaptHackathon,
+  cmdStartupStatus,
+  cmdStartupNext,
 } from './handlers.js';
 
 const program = new Command();
@@ -251,6 +258,69 @@ video
     success(`Video plan: ${plan.value.title} (${plan.value.duration_seconds}s, ${plan.value.scenes.length} scenes)`);
   });
 
+// ─── startup discovery ───────────────────────────────────────────────────────
+const startup = program.command('startup').description('Problem-first startup discovery workflow');
+
+function collectOption(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
+startup
+  .command('research')
+  .description('Map market pain points before solution ideation')
+  .requiredOption('--market <market>', 'market or domain to research')
+  .requiredOption('--segments <segments>', 'comma-separated target segments')
+  .option('--source <file-or-url>', 'source reference to preserve as provenance', collectOption, [])
+  .option('--sources-file <path>', 'YAML/JSON file containing source references')
+  .option('--agent <agent>', 'intended agent for later refinement')
+  .option('--output <path>', 'optional additional YAML output path')
+  .option('--agent-handoff', 'generate Claude Code and Codex research prompts')
+  .action(async (opts) => cmdStartupResearch(store(), opts));
+
+startup
+  .command('scorecard')
+  .description('Rank pain points by evidence-aware opportunity quality')
+  .option('--research-file <path>', 'research YAML artifact path')
+  .option('--deep-dive-file <path>', 'optional deep-dive YAML artifact path')
+  .option('--agent <agent>', 'intended agent for later refinement')
+  .action(async (opts) => cmdStartupScorecard(store(), opts));
+
+startup
+  .command('deep-dive <pain-point-id>')
+  .description('Investigate one pain point and seek disconfirming evidence')
+  .option('--research-file <path>', 'research YAML artifact path')
+  .option('--pain-point-file <path>', 'YAML file containing the selected pain point')
+  .option('--agent <agent>', 'intended agent for later refinement')
+  .action(async (id, opts) => cmdStartupDeepDive(store(), id, opts));
+
+startup
+  .command('validate')
+  .description('Create a falsifiable validation plan from a pain-point deep dive')
+  .option('--deep-dive-file <path>', 'deep-dive YAML artifact path')
+  .option('--methods <methods>', 'comma-separated validation methods')
+  .option('--timeline-days <n>', 'validation timeline in days', '7')
+  .option('--agent <agent>', 'intended agent for later refinement')
+  .action(async (opts) => cmdStartupValidate(store(), opts));
+
+startup
+  .command('adapt-hackathon')
+  .description('Map existing hackathon skills into a problem-first startup workflow')
+  .option('--profile <profile>', 'startup or startup-contest', 'startup')
+  .option('--source-skills <skills>', 'comma-separated source skill profile')
+  .option('--agent <agent>', 'intended agent for later refinement')
+  .action(async (opts) => cmdStartupAdaptHackathon(store(), opts));
+
+startup
+  .command('status')
+  .description('Show startup discovery artifacts, blockers, and next action')
+  .option('--json', 'output stable JSON for agents')
+  .action(async (opts) => cmdStartupStatus(store(), opts));
+
+startup
+  .command('next')
+  .description('Recommend the next valid startup discovery action')
+  .action(async () => cmdStartupNext(store()));
+
 video
   .command('generate')
   .description('Generate the complete demo-video/ HyperFrames project')
@@ -437,6 +507,13 @@ export {
   cmdSubmit,
   cmdDoctor,
   cmdUpdate,
+  cmdStartupResearch,
+  cmdStartupScorecard,
+  cmdStartupDeepDive,
+  cmdStartupValidate,
+  cmdStartupAdaptHackathon,
+  cmdStartupStatus,
+  cmdStartupNext,
 } from './handlers.js';
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

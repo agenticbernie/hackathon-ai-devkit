@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agenticbernie.dev/hadk/skills/startup-opportunity-scorecard.input.schema.json",
+  "title": "Startup Opportunity Scorecard Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["research_artifact"],
+  "properties": {
+    "research_artifact": {"type": "string", "minLength": 1},
+    "deep_dive_artifacts": {"type": "array", "items": {"type": "string"}},
+    "pain_points": {"type": "array", "items": {"type": "object"}},
+    "scoring_profile": {"type": "object", "properties": {"weights": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}}}, "additionalProperties": false},
+    "agent": {"type": "string"}
+  }
+}

@@ -1,6 +1,6 @@
 # Hackathon AI DevKit (HADK)
 
-**Version: 2.0.5**
+**Version: 2.0.7**
 
 > **Turn any competition brief into a winning strategy, scoped prototype,
 > executable project scaffold, reliable demo, and submission-ready package.**
@@ -18,7 +18,15 @@ HADK takes a competition brief (a URL or a markdown file) and drives a
 disciplined pipeline from idea to submission:
 
 ```text
-ingest → strategy → idea → scope → scaffold → build → demo → video → judge → submission
+    ingest → strategy → idea → scope → scaffold → build → demo → video → judge → submission
+
+Startup discovery can run independently of `selected-idea`:
+
+    research pain → deep dive → validation plan → customer evidence
+
+With opportunity ranking:
+
+    research source → scorecard → deep dive → validation plan → customer evidence
 ```
 
 At every step it produces **real artifacts** (YAML contracts and actual project
@@ -137,6 +145,13 @@ submission) are persisted alongside state.
 | `hadk configure` | Update team and competition configuration. |
 | `hadk strategy` | Select strategy mode and taste profile. |
 | `hadk idea` | Generate, score, rank, and select candidate ideas. |
+ | `hadk startup research` | Map market pain points before solution ideation. |
+| `hadk startup scorecard` | Rank pain points with transparent 1–5 evidence-aware scores. |
+| `hadk startup deep-dive <id>` | Investigate one pain point and seek disconfirming evidence. |
+| `hadk startup validate` | Create a falsifiable validation plan. |
+| `hadk startup status [--json]` | Show startup discovery artifacts, blockers, and next action. |
+| `hadk startup next` | Recommend the next valid startup discovery action. |
+| `hadk startup adapt-hackathon` | Map hackathon skills to startup workflows. |
 | `hadk scope` | Create and lock the MVP scope (`--unlock` to reopen). |
 | `hadk scaffold` | Generate a project scaffold (`--profile`, `--dry-run`, `--force`). |
 | `hadk status` | Show phase, gates, deadline mode, and next action (`--json`). |
@@ -209,6 +224,7 @@ state and scope:
 - Rendering a demo MP4 requires the external HyperFrames CLI; without it, only
   the (valid, previewable) composition is produced.
 - Startup-contest skills are beta.
+- Startup scorecards are prioritization tools, not proof of product-market fit. Missing evidence and confidence are retained in every score.
 - The installer targets POSIX/macOS/Linux developer machines with Node ≥ 20.
 - Skill counts and metadata are validated against `manifest.yaml` by
   `hadk validate registry` rather than hardcoded here, so they cannot silently
@@ -235,6 +251,7 @@ built `dist`, so `pnpm build` must precede `pnpm test`.
 - Real HyperFrames rendering integration and asset auto-capture.
 - CI templates that run the full fixture competition on every PR.
 - Promotion of startup-contest skills from beta to stable.
+- Real venture research integrations with human-reviewed source extraction.
 - A marketplace distribution channel for skills.
 
 ---
