@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticbernie.dev/hadk/v2.1/selected-idea.schema.json",
+  "title": "Selected idea",
+  "type": "object",
+  "required": ["candidate_id", "selection_method", "selection_reason", "evidence_refs", "verification_status"],
+  "properties": {
+    "candidate_id": { "type": "string" }, "selection_method": { "enum": ["human", "validated-agent"] }, "selection_reason": { "type": "string" },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } }, "verification_status": { "enum": ["planned", "in_progress", "blocked", "unverified", "verified", "agent_reported", "human_attested"] }
+  }
+}

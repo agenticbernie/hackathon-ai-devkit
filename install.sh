@@ -2,7 +2,7 @@
 #
 # HADK installer — installs the AI-native Competition Engineering Harness.
 #
-#   curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/9a23e2d84f595acd03e93de6a8a2bf2054f115ae/install.sh | bash
 #
 # Or, safer (inspect first):
 #   curl -fsSL .../install.sh -o install.sh && less install.sh && bash install.sh
@@ -10,7 +10,9 @@
 # Environment variables:
 #   HADK_INSTALL_DIR     Where the harness source lives (default: $HOME/.hadk)
 #   HADK_BIN_DIR         Where the `hadk` launcher is linked (default: $HOME/.local/bin)
-#   HADK_VERSION         Git ref to install (default: main)
+#   HADK_VERSION         Immutable tag or commit to install (default: current v2.1 release revision)
+#   HADK_ALLOW_MOVING_REF Set to 1 to explicitly allow main/master or another moving ref
+#   HADK_SHA256           Optional SHA-256 checksum for the installed source tree
 #   HADK_NON_INTERACTIVE Set to 1 to skip all prompts
 #   HADK_REPO            Override the source repository URL
 #
@@ -21,7 +23,9 @@ set -euo pipefail
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 HADK_REPO="${HADK_REPO:-https://github.com/agenticbernie/hackathon-ai-devkit.git}"
-HADK_VERSION="${HADK_VERSION:-main}"
+HADK_VERSION="${HADK_VERSION:-9a23e2d84f595acd03e93de6a8a2bf2054f115ae}"
+HADK_ALLOW_MOVING_REF="${HADK_ALLOW_MOVING_REF:-0}"
+HADK_SHA256="${HADK_SHA256:-}"
 HADK_INSTALL_DIR="${HADK_INSTALL_DIR:-$HOME/.hadk}"
 HADK_BIN_DIR="${HADK_BIN_DIR:-$HOME/.local/bin}"
 HADK_NON_INTERACTIVE="${HADK_NON_INTERACTIVE:-0}"
@@ -38,6 +42,55 @@ ok()    { printf '%s\n' "${C_GREEN}✓${C_RESET} $*"; }
 warn()  { printf '%s\n' "${C_YELLOW}⚠${C_RESET} $*"; }
 fail()  { printf '%s\n' "${C_RED}✗${C_RESET} $*" >&2; }
 header(){ printf '\n%s%s%s\n' "$C_BOLD" "$*" "$C_RESET"; }
+
+case "$HADK_VERSION" in
+  main|master|develop|latest|release|stable)
+    if [ "$HADK_ALLOW_MOVING_REF" != "1" ]; then
+      fail "Refusing moving ref '$HADK_VERSION'. Set HADK_VERSION to an immutable tag/commit or HADK_ALLOW_MOVING_REF=1."
+      exit 1
+    fi
+    ;;
+esac
+if [ "$HADK_ALLOW_MOVING_REF" != "1" ] && ! printf '%s' "$HADK_VERSION" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+  fail "HADK_VERSION must be a full 40-character commit SHA unless HADK_ALLOW_MOVING_REF=1."
+  exit 1
+fi
+
+source_sha256() {
+  local source_dir="$1"
+  if [ -d "$source_dir/.git" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      git -C "$source_dir" archive --format=tar HEAD | sha256sum | awk '{print $1}'
+    else
+      git -C "$source_dir" archive --format=tar HEAD | shasum -a 256 | awk '{print $1}'
+    fi
+  else
+    node - "$source_dir" <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const root = path.resolve(process.argv[2]);
+const files = [];
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === '.git' || entry.name === 'node_modules') continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full);
+    else if (entry.isFile()) files.push(full);
+  }
+}
+walk(root);
+files.sort();
+const hash = crypto.createHash('sha256');
+for (const file of files) {
+  hash.update(path.relative(root, file).replaceAll(path.sep, '/'));
+  hash.update('\0');
+  hash.update(fs.readFileSync(file));
+}
+process.stdout.write(hash.digest('hex'));
+NODE
+  fi
+}
 
 confirm() {
   # confirm <prompt> — returns 0 if yes. Auto-yes in non-interactive mode.
@@ -162,20 +215,30 @@ else
   if [ -d "$HADK_INSTALL_DIR/.git" ]; then
     info "Existing installation found — updating to $HADK_VERSION."
     git -C "$HADK_INSTALL_DIR" fetch --quiet origin
-    git -C "$HADK_INSTALL_DIR" checkout --quiet "$HADK_VERSION"
-    git -C "$HADK_INSTALL_DIR" pull --quiet origin "$HADK_VERSION" || warn "git pull failed; continuing with existing checkout."
+    git -C "$HADK_INSTALL_DIR" fetch --quiet origin "$HADK_VERSION" || true
+    git -C "$HADK_INSTALL_DIR" checkout --quiet --detach "$HADK_VERSION"
   else
     info "Cloning $HADK_REPO ($HADK_VERSION)…"
     mkdir -p "$(dirname "$HADK_INSTALL_DIR")"
-    git clone --quiet --branch "$HADK_VERSION" "$HADK_REPO" "$HADK_INSTALL_DIR" \
-      || git clone --quiet "$HADK_REPO" "$HADK_INSTALL_DIR"
+    git clone --quiet "$HADK_REPO" "$HADK_INSTALL_DIR"
+    git -C "$HADK_INSTALL_DIR" checkout --quiet --detach "$HADK_VERSION"
   fi
 fi
 ok "Harness source ready at $HADK_INSTALL_DIR"
 
+SOURCE_CHECKSUM_SOURCE="$HADK_INSTALL_DIR"
+SOURCE_SHA256="$(source_sha256 "$SOURCE_CHECKSUM_SOURCE" || true)"
+if [ -n "$HADK_SHA256" ]; then
+  if [ -z "$SOURCE_SHA256" ] || [ "$SOURCE_SHA256" != "$HADK_SHA256" ]; then
+    fail "Source checksum mismatch. Expected $HADK_SHA256, got ${SOURCE_SHA256:-unavailable}."
+    exit 1
+  fi
+  ok "Source checksum verified."
+fi
+
 # ─── 8. Build the CLI ────────────────────────────────────────────────────────
 header "Building the CLI"
-( cd "$HADK_INSTALL_DIR" && "$PKG_MANAGER" install )
+( cd "$HADK_INSTALL_DIR" && "$PKG_MANAGER" install --frozen-lockfile )
 ( cd "$HADK_INSTALL_DIR" && "$PKG_MANAGER" run build )
 ok "Build complete"
 
@@ -219,6 +282,10 @@ cat > "$INSTALL_MANIFEST" <<EOF
   "node": "v$NODE_VERSION",
   "package_manager": "$PKG_MANAGER",
   "install_dir": "$HADK_INSTALL_DIR",
+  "source_revision": "$(git -C "$HADK_INSTALL_DIR" rev-parse HEAD 2>/dev/null || printf '%s' "$HADK_VERSION")",
+  "source_ref_requested": "$HADK_VERSION",
+  "source_sha256_pin": "$HADK_SHA256",
+  "source_sha256_actual": "$SOURCE_SHA256",
   "bin_dir": "$HADK_BIN_DIR",
   "launcher": "$LAUNCHER",
   "agents": "$(echo "$DETECTED_AGENTS" | xargs || true)"

@@ -1,0 +1,18 @@
+{
+  "schema_version": "2.1",
+  "schemas": {
+    "competition-facts": "schemas/v2.1/competition-facts.schema.json",
+    "strategy": "schemas/v2.1/strategy.schema.json",
+    "idea-candidate": "schemas/v2.1/idea-candidate.schema.json",
+    "selected-idea": "schemas/v2.1/selected-idea.schema.json",
+    "scope": "schemas/v2.1/scope.schema.json",
+    "architecture-plan": "schemas/v2.1/architecture-plan.schema.json",
+    "agent-capability": "schemas/v2.1/agent-capability.schema.json",
+    "agent-task-packet": "schemas/v2.1/agent-task-packet.schema.json",
+    "agent-result": "schemas/v2.1/agent-result.schema.json",
+    "verification-result": "schemas/v2.1/verification-result.schema.json",
+    "demo-verification": "schemas/v2.1/demo-verification.schema.json",
+    "submission-requirement": "schemas/v2.1/submission-requirement.schema.json",
+    "submission-package": "schemas/v2.1/submission-package.schema.json"
+  }
+}

@@ -1,12 +1,21 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://agenticbernie.dev/hadk/schemas/state.schema.json",
-  "title": "HADK Competition State",
+  "title": "HADK v2.1 Competition State",
   "description": "Canonical persistent competition state stored at .hackathon/state.yaml. Single source of truth for the harness; never rely on conversational memory.",
   "type": "object",
   "required": ["schema_version", "competition", "team", "strategy", "scope", "architecture", "delivery", "gates"],
   "properties": {
-    "schema_version": { "type": "string" },
+    "schema_version": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "created_by": { "type": "string" },
+    "source_refs": { "type": "array", "items": { "type": "string" } },
+    "assumptions": { "type": "array", "items": { "type": "string" } },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "verification_status": { "enum": ["planned", "in_progress", "blocked", "unverified", "verified", "agent_reported", "human_attested"] },
+    "evidence": { "type": "array", "items": { "$ref": "v2.1/evidence.schema.json" } },
     "competition": {
       "type": "object",
       "required": ["type"],
@@ -26,11 +35,11 @@
     "strategy": {
       "type": "object",
       "properties": {
-        "mode": { "type": "string", "enum": ["conservative", "realistic", "futuristic"] },
-        "taste_source": { "type": "string", "enum": ["user", "auto"] },
+        "mode": { "type": "string", "enum": ["execution-first", "balanced", "differentiation-first", "conservative", "realistic", "futuristic"] },
+        "taste_source": { "type": "string", "enum": ["user", "auto", "auto_fallback"] },
         "idea_taste": { "type": "object" },
         "selected_track": { "type": ["string", "null"] },
-        "selected_idea": { "type": ["object", "null"] },
+        "selected_idea": { "type": ["string", "object", "null"] },
         "scoring_profile": { "type": ["object", "null"] }
       }
     },

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticbernie.dev/hadk/v2.1/idea-candidate.schema.json",
+  "title": "Idea candidate",
+  "type": "object",
+  "required": ["problem", "target_user", "solution", "core_mechanism", "rubric_mapping", "sponsor_fit", "demo_proof", "implementation_estimate", "dependencies", "fallback", "failure_modes", "assumptions", "evidence_refs", "adversarial_critique", "generation_mode", "verification_status"],
+  "properties": {
+    "problem": { "type": "string" }, "target_user": { "type": "string" }, "solution": { "type": "string" }, "core_mechanism": { "type": "string" },
+    "rubric_mapping": { "type": "array", "items": { "type": "string" } }, "sponsor_fit": { "type": "string" }, "demo_proof": { "type": "string" },
+    "implementation_estimate": { "type": "number", "minimum": 0 }, "dependencies": { "type": "array", "items": { "type": "string" } },
+    "fallback": { "type": "string" }, "failure_modes": { "type": "array", "items": { "type": "string" } }, "assumptions": { "type": "array", "items": { "type": "string" } },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } }, "adversarial_critique": { "type": "array", "items": { "type": "string" } },
+    "generation_mode": { "enum": ["agent-backed", "human-imported", "heuristic-draft"] }, "verification_status": { "enum": ["planned", "in_progress", "blocked", "unverified", "verified", "agent_reported", "human_attested"] }
+  }
+}

@@ -13,6 +13,11 @@
     { "path": "../scaffold-engine" },
     { "path": "../validators" },
     { "path": "../hyperframes-adapter" },
-    { "path": "../agent-adapters" }
+    { "path": "../agent-adapters" },
+    { "path": "../competition-intelligence" },
+    { "path": "../planning" },
+    { "path": "../agent-bridge" },
+    { "path": "../verification" },
+    { "path": "../submission" }
   ]
 }

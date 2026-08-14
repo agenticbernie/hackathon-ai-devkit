@@ -47,6 +47,11 @@ export interface StatusReport {
   submission_status: string;
   deadline_mode: DeadlineMode;
   next_action: NextAction;
+  verified_evidence: number;
+  blockers: string[];
+  assumptions: string[];
+  stale_artifacts: string[];
+  confidence: 'low' | 'medium' | 'high';
 }
 
 // ─── Orchestrator ────────────────────────────────────────────────────────────
@@ -241,11 +246,11 @@ export class Orchestrator {
       strategy: 'hadk strategy',
       idea: 'hadk idea',
       scope: 'hadk scope',
-      architecture: 'hadk scaffold',
+      architecture: 'hadk architecture plan',
       scaffold: 'hadk scaffold',
-      build: 'hadk validate build',
-      demo: 'hadk demo',
-      video: 'hadk video generate',
+      build: 'hadk verify build',
+      demo: 'hadk verify demo',
+      video: 'hadk package review',
       judge: 'hadk judge',
       submission: 'hadk submit',
     };
@@ -300,6 +305,11 @@ export class Orchestrator {
       submission_status: state.delivery.submission_status,
       deadline_mode: this.getDeadlineMode(state),
       next_action: this.getNextAction(state),
+      verified_evidence: (state.evidence ?? []).filter((e) => e.status === 'verified' || e.status === 'captured').length,
+      blockers: state.blockers ?? [],
+      assumptions: state.assumptions ?? [],
+      stale_artifacts: state.architecture.status === 'invalidated' ? ['architecture', 'handoff', 'verification'] : [],
+      confidence: (state.evidence ?? []).length > 3 && !(state.blockers ?? []).length ? 'high' : (state.evidence ?? []).length > 0 ? 'medium' : 'low',
     };
   }
 

@@ -195,8 +195,10 @@ async def health():
     }
 `));
 
-  files.push(mkFile('backend/app/api/process.py', `from fastapi import APIRouter
-from pydantic import BaseModel
+files.push(mkFile('backend/app/api/process.py', `import os
+
+from fastapi import APIRouter, Header, HTTPException
+from pydantic import BaseModel, Field
 
 from app.core.ai import invoke_ai
 
@@ -204,11 +206,15 @@ router = APIRouter()
 
 
 class ProcessRequest(BaseModel):
-    input: str
+    input: str = Field(max_length=8000)
 
 
 @router.post("/process")
-async def process(req: ProcessRequest):
+async def process(req: ProcessRequest, authorization: str | None = Header(default=None)):
+    fallback = os.getenv("DEMO_FALLBACK_MODE", "true") == "true" or not os.getenv("OPENAI_API_KEY")
+    configured_token = os.getenv("DEMO_API_TOKEN")
+    if not fallback and (not configured_token or authorization != f"Bearer {configured_token}"):
+        raise HTTPException(status_code=401, detail="Authentication required for live inference")
     result = await invoke_ai(req.input)
     return {"result": result}
 `));
@@ -260,6 +266,7 @@ OPENAI_API_KEY=
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 DEMO_FALLBACK_MODE=true
+DEMO_API_TOKEN=replace-with-a-long-random-token-for-live-demo-access
 `));
 
   files.push(mkFile('backend/.env', `OPENAI_API_KEY=

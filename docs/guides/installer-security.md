@@ -3,11 +3,16 @@
 The full harness is installed with:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/9a23e2d84f595acd03e93de6a8a2bf2054f115ae/install.sh | bash
 ```
 
 This guide explains what the installer does, how to control it, and the safety
 guarantees it provides.
+
+For v2.1, prefer an immutable release tag or commit revision. Moving branches
+are supported only with explicit opt-in and must be recorded in the install
+manifest. Package installation uses the repository lockfile. Never place
+credentials in installer output or generated project artifacts.
 
 ## What the installer does
 
@@ -28,7 +33,9 @@ guarantees it provides.
 |---|---|---|
 | `HADK_INSTALL_DIR` | `~/.hadk` | Where the harness is installed. |
 | `HADK_BIN_DIR` | `~/.local/bin` | Where the `hadk` launcher is written. |
-| `HADK_VERSION` | latest | Pin a git ref/version. |
+| `HADK_VERSION` | pinned v2.1 commit SHA | Full 40-character commit SHA; moving refs require explicit opt-in. |
+| `HADK_ALLOW_MOVING_REF` | `0` | Set to `1` only when intentionally using a moving ref. |
+| `HADK_SHA256` | unset | Optional SHA-256 pin for the deterministic Git source archive. |
 | `HADK_REPO` | upstream URL | Override the source repository. |
 | `HADK_NON_INTERACTIVE` | unset | Set to `1` to skip confirmations (CI). |
 
@@ -41,6 +48,8 @@ guarantees it provides.
   pre-existing *unmanaged* `hadk` is backed up rather than overwritten.
 - **Validated.** Installation is confirmed by running the CLI and a validation
   script before reporting success.
+- **Checksum-aware.** When `HADK_SHA256` is supplied, install/update refuses a
+  source archive whose checksum does not match and records the actual checksum.
 
 ## Uninstalling
 
@@ -77,5 +86,11 @@ it accordingly:
 For CI, combine a pinned version with non-interactive mode:
 
 ```bash
-HADK_VERSION=v2.0.0 HADK_NON_INTERACTIVE=1 bash install.sh
+HADK_VERSION=9a23e2d HADK_NON_INTERACTIVE=1 bash install.sh
+```
+
+To calculate the archive checksum for a checked-out revision:
+
+```bash
+git archive --format=tar HEAD | sha256sum
 ```

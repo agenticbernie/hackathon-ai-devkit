@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticbernie.dev/hadk/v2.1/architecture-plan.schema.json",
+  "title": "Architecture plan",
+  "type": "object",
+  "required": ["schema_version", "version", "system_context", "component_boundaries", "data_flow", "external_integrations", "security_boundaries", "deployment_assumptions", "decisions", "feature_to_component", "implementation_sequence", "verification_strategy"],
+  "properties": {
+    "schema_version": { "const": "2.1" }, "version": { "type": "string" }, "system_context": { "type": "string" }, "component_boundaries": { "type": "array" },
+    "data_flow": { "type": "array" }, "external_integrations": { "type": "array" }, "security_boundaries": { "type": "array" }, "deployment_assumptions": { "type": "array" },
+    "decisions": { "type": "array" }, "feature_to_component": { "type": "object" }, "implementation_sequence": { "type": "array" }, "verification_strategy": { "type": "array" }
+  }
+}

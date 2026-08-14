@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticbernie.dev/hadk/v2.1/submission-requirement.schema.json",
+  "title": "Submission requirement",
+  "type": "object",
+  "required": ["requirement_id", "source", "mandatory", "accepted_format", "status"],
+  "properties": { "requirement_id": { "type": "string" }, "source": { "type": "string" }, "mandatory": { "type": "boolean" }, "accepted_format": { "type": "string" }, "deadline": { "type": ["string", "null"] }, "evidence_artifact_ref": { "type": ["string", "null"] }, "status": { "enum": ["missing", "in_progress", "satisfied", "blocked"] }, "reviewer_note": { "type": ["string", "null"] } }
+}

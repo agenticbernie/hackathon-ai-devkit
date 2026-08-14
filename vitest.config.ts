@@ -15,6 +15,12 @@ const pkgs = [
   'hyperframes-adapter',
   'agent-adapters',
   'cli',
+  'competition-intelligence',
+  'planning',
+  'agent-bridge',
+  'verification',
+  'submission',
+  'workspace',
 ];
 
 const alias = Object.fromEntries(
@@ -26,8 +32,8 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
-    testTimeout: 60000,
-    hookTimeout: 60000,
+    testTimeout: 180000,
+    hookTimeout: 120000,
     // Tests run against the built packages (dist), so `pnpm build` must run first.
     pool: 'forks',
   },

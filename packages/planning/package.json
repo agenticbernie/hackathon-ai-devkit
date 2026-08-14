@@ -1,0 +1,12 @@
+{
+  "name": "@hadk/planning",
+  "version": "2.1.0",
+  "description": "Strategy, scope, and architecture contracts for HADK",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": { "build": "tsc -p tsconfig.json", "clean": "rm -rf dist *.tsbuildinfo" },
+  "dependencies": { "@hadk/core": "workspace:*" },
+  "devDependencies": { "typescript": "^5.7.0" }
+}

@@ -73,7 +73,7 @@ describe('problem-first startup discovery', () => {
     const store = new StateStore(dir);
     const sourceFile = join(dir, 'notes.md');
     writeFileSync(sourceFile, 'A local founder note.', 'utf8');
-    const fetchMock = vi.fn(async (input: URL | string) => {
+    const fetchMock = vi.fn(async (input: unknown) => {
       const url = String(input);
       if (url.includes('404')) return new Response('missing', { status: 404 });
       if (url.includes('timeout')) throw new Error('timeout simulated');
@@ -81,7 +81,7 @@ describe('problem-first startup discovery', () => {
       return new Response('Public source content.', { status: 200 });
     });
     vi.stubGlobal('fetch', fetchMock);
-    await cmdStartupResearch(store, { market: 'test market', segments: 'test users', source: ['https://example.test/success', 'https://example.test/404', 'https://example.test/timeout', 'https://example.test/empty', 'http://[invalid-url', sourceFile] });
+    await cmdStartupResearch(store, { market: 'test market', segments: 'test users', source: ['https://example.com/success', 'https://example.com/404', 'https://example.com/timeout', 'https://example.com/empty', 'http://[invalid-url', sourceFile], fetcher: fetchMock });
     const research = yaml<any>('pain-point-research.yaml');
     expect(research.provenance).toHaveLength(6);
     expect(research.provenance.find((source: any) => source.source.includes('/success')).retrieval_status).toBe('retrieved');

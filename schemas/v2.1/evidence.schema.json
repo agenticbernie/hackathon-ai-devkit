@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticbernie.dev/hadk/v2.1/evidence.schema.json",
+  "title": "HADK evidence",
+  "type": "object",
+  "required": ["id", "evidence_type", "source", "actor", "timestamp", "status", "checksum", "redaction"],
+  "properties": {
+    "id": { "type": "string" },
+    "evidence_type": { "enum": ["command_execution", "test_output", "build_output", "healthcheck_output", "browser_demo", "api_demo", "human_attestation", "agent_result", "source_excerpt", "user_confirmation"] },
+    "source": { "type": "string" },
+    "actor": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "status": { "enum": ["captured", "verified", "rejected", "redacted"] },
+    "content": { "type": "string" },
+    "path": { "type": "string" },
+    "checksum": { "type": ["string", "null"] },
+    "redaction": { "type": "object", "required": ["applied", "fields"], "properties": { "applied": { "type": "boolean" }, "fields": { "type": "array", "items": { "type": "string" } }, "note": { "type": "string" } } }
+  }
+}

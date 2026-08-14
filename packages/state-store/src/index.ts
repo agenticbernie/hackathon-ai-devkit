@@ -23,15 +23,28 @@ import {
   stringifyYaml,
   generateId,
   nowIso,
+  safeResolvePath,
+  redactSecrets,
 } from '@hadk/core';
 import { mkdirSync, existsSync, readFileSync, writeFileSync, readdirSync, copyFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
+import { createHash } from 'node:crypto';
 
 // ─── Default State ───────────────────────────────────────────────────────────
 
 export function createDefaultState(): CompetitionState {
+  const timestamp = nowIso();
   return {
     schema_version: SCHEMA_VERSION,
+    created_at: timestamp,
+    updated_at: timestamp,
+    created_by: 'hadk',
+    source_refs: [],
+    assumptions: [],
+    blockers: [],
+    evidence_refs: [],
+    verification_status: 'planned',
+    evidence: [],
     competition: {
       name: null,
       type: 'hackathon',
@@ -220,6 +233,7 @@ export class StateStore {
   }
 
   save(state: CompetitionState): Result<void> {
+    state.updated_at = nowIso();
     const result = writeYamlFileAtomic(this.statePath, state);
     if (!result.ok) return result;
     return ok(undefined);
@@ -331,11 +345,15 @@ export class StateStore {
   // ─── Artifacts ───────────────────────────────────────────────────────────
 
   artifactPath(category: string, filename: string): string {
-    return join(this.artifactsDir, category, filename);
+    const checked = safeResolvePath(this.artifactsDir, join(category, filename));
+    if (!checked.ok) throw new Error(checked.error.message);
+    return checked.value;
   }
 
   writeArtifact(category: string, filename: string, data: unknown): Result<string> {
-    const filePath = this.artifactPath(category, filename);
+    let filePath: string;
+    try { filePath = this.artifactPath(category, filename); }
+    catch (e) { return err(hadkError('ARTIFACT_PATH_DENIED', (e as Error).message)); }
     const result = writeYamlFileAtomic(filePath, data);
     if (!result.ok) return err(hadkError('ARTIFACT_WRITE_FAILED', `Failed to write artifact: ${result.error.message}`));
     this.log('artifact', `Wrote artifact ${category}/${filename}`);
@@ -346,7 +364,7 @@ export class StateStore {
     try {
       const filePath = this.artifactPath(category, filename);
       mkdirSync(dirname(filePath), { recursive: true });
-      writeFileSync(filePath, content, 'utf-8');
+      writeFileSync(filePath, redactSecrets(content), 'utf-8');
       this.log('artifact', `Wrote artifact ${category}/${filename}`);
       return ok(filePath);
     } catch (e) {
@@ -371,11 +389,17 @@ export class StateStore {
   }
 
   readArtifact<T>(category: string, filename: string): Result<T> {
-    return readYamlFile<T>(this.artifactPath(category, filename));
+    try {
+      return readYamlFile<T>(this.artifactPath(category, filename));
+    } catch (e) {
+      return err(hadkError('ARTIFACT_PATH_DENIED', (e as Error).message));
+    }
   }
 
   listArtifacts(category: string): string[] {
-    const dir = join(this.artifactsDir, category);
+    const checked = safeResolvePath(this.artifactsDir, category);
+    if (!checked.ok) return [];
+    const dir = checked.value;
     if (!existsSync(dir)) return [];
     return readdirSync(dir).filter((f) => f.endsWith('.yaml') || f.endsWith('.yml') || f.endsWith('.md'));
   }
@@ -387,10 +411,52 @@ export class StateStore {
       const logPath = join(this.logsDir, 'history.log');
       const line = `${nowIso()} [${event}] ${message}\n`;
       const existing = existsSync(logPath) ? readFileSync(logPath, 'utf-8') : '';
-      writeFileSync(logPath, existing + line, 'utf-8');
+      writeFileSync(logPath, redactSecrets(existing + line), 'utf-8');
     } catch {
       // Logging must never crash the harness
     }
+  }
+
+  /** Persist append-only evidence under the confined evidence directory. */
+  recordEvidence(input: Omit<import('@hadk/core').Evidence, 'id' | 'timestamp' | 'checksum'> & { id?: string; timestamp?: string; checksum?: string | null }): Result<import('@hadk/core').Evidence> {
+    if (input.id && !/^[A-Za-z0-9._-]+$/.test(input.id)) {
+      return err(hadkError('EVIDENCE_ID_INVALID', 'Evidence IDs may contain only letters, numbers, dots, underscores, and hyphens.'));
+    }
+    const evidence: import('@hadk/core').Evidence = {
+      id: input.id ?? generateId('evidence'),
+      evidence_type: input.evidence_type,
+      source: input.source,
+      actor: input.actor,
+      timestamp: input.timestamp ?? nowIso(),
+      status: input.status,
+      content: input.content ? redactSecrets(input.content) : undefined,
+      path: input.path,
+      checksum: input.checksum ?? (input.content ? createHash('sha256').update(input.content).digest('hex') : null),
+      redaction: input.redaction,
+      metadata: input.metadata,
+    };
+    const evidencePath = safeResolvePath(this.evidenceDir, `${evidence.id}.yaml`);
+    if (!evidencePath.ok) return err(evidencePath.error);
+    const written = writeYamlFileAtomic(evidencePath.value, evidence);
+    if (!written.ok) return err(hadkError('EVIDENCE_WRITE_FAILED', written.error.message));
+    const updated = this.update((state) => {
+      state.evidence ??= [];
+      state.evidence.push(evidence);
+      state.evidence_refs ??= [];
+      state.evidence_refs.push(evidence.id);
+    });
+    if (!updated.ok) return err(updated.error);
+    return ok(evidence);
+  }
+
+  listEvidence(): import('@hadk/core').Evidence[] {
+    const loaded = this.load();
+    return loaded.ok ? (loaded.value.evidence ?? []) : [];
+  }
+
+  /** Validate an existing project-relative file before it is referenced as evidence. */
+  confinedFilePath(requested: string): Result<string> {
+    return safeResolvePath(this.projectRoot, requested);
   }
 }
 
@@ -410,10 +476,22 @@ export function migrateState(raw: CompetitionState): MigrationResult {
   let changed = false;
 
   if (state.schema_version !== SCHEMA_VERSION) {
-    // Future: apply incremental migrations per version
+    // v1.0 and v2.0 state remain structurally compatible. New metadata is
+    // intentionally unverified until evidence is recorded.
     state.schema_version = SCHEMA_VERSION;
     changed = true;
   }
+
+  const timestamp = nowIso();
+  if (!state.created_at) { state.created_at = timestamp; changed = true; }
+  if (!state.updated_at) { state.updated_at = timestamp; changed = true; }
+  if (!state.created_by) { state.created_by = 'migration'; changed = true; }
+  if (!state.source_refs) { state.source_refs = []; changed = true; }
+  if (!state.assumptions) { state.assumptions = []; changed = true; }
+  if (!state.blockers) { state.blockers = []; changed = true; }
+  if (!state.evidence_refs) { state.evidence_refs = []; changed = true; }
+  if (!state.evidence) { state.evidence = []; changed = true; }
+  if (!state.verification_status) { state.verification_status = 'unverified'; changed = true; }
 
   // Ensure structural completeness (guards against partial older states)
   const defaults = createDefaultState();

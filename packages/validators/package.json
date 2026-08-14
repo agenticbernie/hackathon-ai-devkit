@@ -1,6 +1,6 @@
 {
   "name": "@hadk/validators",
-  "version": "2.0.7",
+  "version": "2.1.0",
   "description": "Executable validation gates for HADK — registry, competition, idea, scope, scaffold, build, demo, video, submission",
   "type": "module",
   "main": "dist/index.js",

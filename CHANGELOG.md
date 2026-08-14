@@ -1,3 +1,20 @@
+# 2.1.0 — 2026-08-15
+
+## Productization
+
+- Repositioned HADK as an evidence-backed Competition Delivery Control Plane.
+- Added v2.1 architecture, migration, boundaries, and decision records.
+- Added typed evidence, artifact metadata, schema registry, safe path handling,
+  and state migration metadata.
+- Added reviewed brief facts with SSRF/content-size/content-type/path controls.
+- Added execution-first, balanced, and differentiation-first strategy modes.
+- Heuristic ideas are unverified drafts and require explicit selection.
+- Added architecture plans, agent-compatible task packets, and stale-result
+  rejection for Claude Code, Codex, and OpenCode.
+- Added real build/demo verification with captured command evidence.
+- Added requirements-driven local submission packages and review/export commands.
+- Kept scaffold profiles, startup discovery, and HyperFrames as deprecated or
+  optional functionality outside the v2.1 core path.
 # Changelog
 
 All notable changes to the HADK (Hackathon AI DevKit) project are documented in this file.

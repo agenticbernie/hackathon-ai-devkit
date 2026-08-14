@@ -6,7 +6,28 @@
 
 export type CompetitionType = 'hackathon' | 'buildathon' | 'startup-contest';
 
-export type StrategyMode = 'conservative' | 'realistic' | 'futuristic';
+export type StrategyMode =
+  | 'execution-first'
+  | 'balanced'
+  | 'differentiation-first'
+  | 'conservative'
+  | 'realistic'
+  | 'futuristic';
+
+export type ArtifactStatus = 'planned' | 'in_progress' | 'blocked' | 'unverified' | 'verified';
+export type VerificationStatus = ArtifactStatus | 'agent_reported' | 'human_attested';
+export type FactStatus = 'extracted' | 'inferred' | 'user_confirmed' | 'unknown' | 'rejected';
+export type EvidenceType =
+  | 'command_execution'
+  | 'test_output'
+  | 'build_output'
+  | 'healthcheck_output'
+  | 'browser_demo'
+  | 'api_demo'
+  | 'human_attestation'
+  | 'agent_result'
+  | 'source_excerpt'
+  | 'user_confirmation';
 
 export type TasteSource = 'user' | 'auto' | 'auto_fallback';
 
@@ -38,6 +59,15 @@ export type SubmissionStatus = 'not_started' | 'in_progress' | 'ready' | 'submit
 
 export interface CompetitionState {
   schema_version: string;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  source_refs?: string[];
+  assumptions?: string[];
+  blockers?: string[];
+  evidence_refs?: string[];
+  verification_status?: VerificationStatus;
+  evidence?: Evidence[];
 
   competition: {
     name: string | null;
@@ -268,6 +298,13 @@ export interface CandidateIdea {
   score_breakdown: Record<string, number>;
   score_breakdown_kind: 'raw' | 'weighted';
   total_score: number;
+  generation_mode?: 'agent-backed' | 'human-imported' | 'heuristic-draft';
+  confidence?: 'low' | 'medium' | 'high';
+  implementation_estimate?: string;
+  dependencies?: string[];
+  adversarial_critique?: string[];
+  assumptions?: string[];
+  evidence_refs?: string[];
 }
 
 export interface SelectedIdea {
@@ -281,6 +318,9 @@ export interface SelectedIdea {
   core_demo_proof: string;
   primary_risk: string;
   fallback: string;
+  selection_method?: 'human' | 'validated-agent';
+  verification_status?: VerificationStatus;
+  evidence_refs?: string[];
 }
 
 // ─── Registry Types ──────────────────────────────────────────────────────────
@@ -318,6 +358,177 @@ export interface ValidationResult {
   passed: boolean;
   issues: ValidationIssue[];
   timestamp: string;
+}
+
+export interface ArtifactMetadata {
+  schema_version: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  source_refs: string[];
+  assumptions: string[];
+  blockers: string[];
+  evidence_refs: string[];
+  verification_status: VerificationStatus;
+}
+
+export interface Evidence {
+  id: string;
+  evidence_type: EvidenceType;
+  source: string;
+  actor: string;
+  timestamp: string;
+  status: 'captured' | 'verified' | 'rejected' | 'redacted';
+  content?: string;
+  path?: string;
+  checksum: string | null;
+  redaction: { applied: boolean; fields: string[]; note?: string };
+  metadata?: Record<string, string | number | boolean>;
+}
+
+export interface CompetitionFact {
+  id: string;
+  field: string;
+  value: unknown;
+  fact_type: FactStatus;
+  confidence: 'low' | 'medium' | 'high';
+  source_ref: string;
+  excerpt: string | null;
+  locator: string | null;
+  unresolved_questions: string[];
+}
+
+export interface StrategyContract extends ArtifactMetadata {
+  mode: 'execution-first' | 'balanced' | 'differentiation-first';
+  dimensions: Record<string, { weight: number; rationale: string }>;
+  intended_use: string;
+  risks: string[];
+  scores_are_decision_aids: true;
+}
+
+export interface ScopeFeatureContract extends ScopeFeature {
+  why_it_exists: string;
+  acceptance_criteria: string[];
+  owner: string;
+  fallback: string | null;
+  demo_step: number;
+  verification_method: string;
+}
+
+export interface ScopeContract extends ArtifactMetadata {
+  status: 'planned' | 'locked' | 'unlocked';
+  core_demo_flow: DemoFlowStep[];
+  primary_proof_point: string;
+  cut_list: string[];
+  implementation_budget: number;
+  integration_budget: number;
+  verification_budget: number;
+  demo_rehearsal_budget: number;
+  buffer: number;
+  risk_budget: number;
+  reset_seed_strategy: string;
+  mvp_features: ScopeFeatureContract[];
+}
+
+export interface ArchitecturePlan extends ArtifactMetadata {
+  version: string;
+  system_context: string;
+  component_boundaries: Array<{ name: string; responsibility: string; owns_data: string[] }>;
+  data_flow: string[];
+  external_integrations: Array<{ name: string; purpose: string; fallback: string }>;
+  security_boundaries: string[];
+  deployment_assumptions: string[];
+  decisions: ArchitectureDecision[];
+  feature_to_component: Record<string, string[]>;
+  implementation_sequence: string[];
+  verification_strategy: string[];
+}
+
+export interface AgentCapability extends ArtifactMetadata {
+  agent: 'claude-code' | 'codex' | 'opencode';
+  capabilities: string[];
+  adapter_version: string;
+  execution_supported: false;
+}
+
+export interface AgentTaskPacket extends ArtifactMetadata {
+  task_id: string;
+  feature_id: string;
+  scope_version: string;
+  architecture_version: string;
+  objective: string;
+  allowed_files: string[];
+  forbidden_files: string[];
+  acceptance_criteria: string[];
+  required_tests: string[];
+  verification_commands: string[][];
+  dependencies: string[];
+  fallback: string;
+  expected_result_schema: string;
+}
+
+export interface AgentResult extends ArtifactMetadata {
+  task_id: string;
+  scope_version: string;
+  status: 'completed' | 'blocked' | 'partial';
+  changed_files: string[];
+  commands_executed: string[][];
+  tests: Array<{ command: string[]; passed: boolean; evidence_ref?: string }>;
+  unresolved_issues: string[];
+  result_evidence_refs: string[];
+}
+
+export interface VerificationStep {
+  id: string;
+  kind: 'install' | 'typecheck' | 'test' | 'build' | 'start' | 'healthcheck' | 'api_smoke' | 'browser';
+  command?: string[];
+  timeout_ms: number;
+  required: boolean;
+}
+
+export interface VerificationResult extends ArtifactMetadata {
+  contract_version: string;
+  project_root: string;
+  steps: Array<{
+    step_id: string;
+    kind: VerificationStep['kind'];
+    status: 'passed' | 'failed' | 'blocked' | 'skipped';
+    exit_code: number | null;
+    stdout_evidence_ref?: string;
+    stderr_evidence_ref?: string;
+    duration_ms: number;
+  }>;
+  passed: boolean;
+}
+
+export interface DemoVerification extends ArtifactMetadata {
+  mode: 'automated' | 'human-attested';
+  reset_seed: string;
+  journey: string[];
+  expected_output: string[];
+  fallback_behavior: string;
+  operator?: string;
+  checklist?: Array<{ item: string; passed: boolean; note?: string }>;
+  media_refs?: string[];
+  automated: boolean;
+}
+
+export interface SubmissionRequirement {
+  requirement_id: string;
+  source: string;
+  mandatory: boolean;
+  accepted_format: string;
+  deadline: string | null;
+  evidence_artifact_ref: string | null;
+  status: 'missing' | 'in_progress' | 'satisfied' | 'blocked';
+  reviewer_note: string | null;
+}
+
+export interface SubmissionPackage extends ArtifactMetadata {
+  package_version: string;
+  requirements: SubmissionRequirement[];
+  export_path: string | null;
+  ready: boolean;
 }
 
 // ─── Scaffold Types ──────────────────────────────────────────────────────────

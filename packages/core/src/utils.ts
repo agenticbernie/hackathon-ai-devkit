@@ -3,8 +3,8 @@
  */
 
 import yaml from 'js-yaml';
-import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync, copyFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync, copyFileSync, lstatSync, realpathSync } from 'node:fs';
+import { dirname, join, relative, resolve, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 // ─── Result Type ─────────────────────────────────────────────────────────────
@@ -77,8 +77,16 @@ export function writeYamlFileAtomic(filePath: string, data: unknown): Result<voi
 
     // Backup existing file for corruption protection
     if (existsSync(filePath)) {
+      if (lstatSync(filePath).isSymbolicLink()) {
+        return err(hadkError('FILE_WRITE_ERROR', `Refusing to overwrite symlink: ${filePath}`));
+      }
       const backupPath = filePath + '.bak';
-      copyFileSync(filePath, backupPath);
+      if (existsSync(backupPath) && lstatSync(backupPath).isSymbolicLink()) {
+        return err(hadkError('FILE_WRITE_ERROR', `Refusing to overwrite symlink backup: ${backupPath}`));
+      }
+      const backupTempPath = join(dir, `.${randomUUID()}.bak.tmp`);
+      copyFileSync(filePath, backupTempPath);
+      renameSync(backupTempPath, backupPath);
     }
 
     writeFileSync(tmpPath, content, 'utf-8');
@@ -124,4 +132,45 @@ export function sumWeights(weights: Record<string, number>): number {
 
 export function weightsSumToOne(weights: Record<string, number>, tolerance = 0.001): boolean {
   return Math.abs(sumWeights(weights) - 1.0) <= tolerance;
+}
+
+const SECRET_PATH = /(^|\/)(\.env(?:\..*)?|credentials?|secrets?|.*private.*key.*|.*token.*|.*cloud.*credential.*)(\/|$)/i;
+
+/** Resolve a path under a workspace root and reject traversal or symlink escape. */
+export function safeResolvePath(root: string, requested: string, options: { allowOutsideRoot?: boolean; allowSecrets?: boolean } = {}): Result<string> {
+  const workspace = resolve(root);
+  const candidate = isAbsolute(requested) ? resolve(requested) : resolve(workspace, requested);
+  const rel = relative(workspace, candidate);
+  if (!options.allowOutsideRoot && (rel === '..' || rel.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || isAbsolute(rel))) {
+    return err(hadkError('PATH_OUTSIDE_ROOT', `Path is outside the project root: ${requested}`));
+  }
+  if (!options.allowSecrets && SECRET_PATH.test(relative(workspace, candidate).replaceAll('\\', '/'))) {
+    return err(hadkError('SECRET_PATH_DENIED', `Secret-bearing path is not allowed: ${requested}`));
+  }
+  let current = candidate;
+  while (current !== workspace && current !== dirname(current)) {
+    if (existsSync(current)) {
+      try {
+        const stat = lstatSync(current);
+        if (stat.isSymbolicLink()) {
+          const target = realpathSync(current);
+          const targetRel = relative(workspace, target);
+          if (!options.allowOutsideRoot && (targetRel === '..' || targetRel.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) || isAbsolute(targetRel))) {
+            return err(hadkError('SYMLINK_ESCAPE', `Symlink escapes the project root: ${requested}`));
+          }
+        }
+      } catch (e) {
+        return err(hadkError('PATH_CHECK_FAILED', `Could not validate path ${requested}: ${(e as Error).message}`));
+      }
+    }
+    current = dirname(current);
+  }
+  return ok(candidate);
+}
+
+export function redactSecrets(value: string): string {
+  return value
+    .replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/gi, '[REDACTED PEM PRIVATE KEY]')
+    .replace(/(api[_-]?key|token|password|secret|private[_-]?key)\s*[=:]\s*["']?[^"'\s,;]+/gi, '$1=[REDACTED]')
+    .replace(/\b(sk|ghp|xoxb|AIza)[A-Za-z0-9_-]{12,}\b/g, '[REDACTED]');
 }

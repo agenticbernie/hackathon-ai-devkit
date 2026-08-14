@@ -8,6 +8,8 @@ on:
 
 jobs:
   build-and-test:
+    permissions:
+      contents: read
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -17,10 +19,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node-version }}
 
@@ -48,13 +52,23 @@ jobs:
       - name: Validate registry
         run: pnpm run validate
 
+      - name: Validate v2.1 schema registry
+        run: pnpm run validate:schemas
+
+      - name: Validate reference and security contracts
+        run: pnpm test -- tests/e2e.test.ts tests/v21-contracts.test.ts
+
   installer-check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
-      - name: Shellcheck installer
+        run: shellcheck install.sh update.sh uninstall.sh
         run: sudo apt-get update && sudo apt-get install -y shellcheck && shellcheck install.sh update.sh uninstall.sh
 
       - name: Smoke test local installer

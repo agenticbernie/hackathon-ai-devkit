@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticbernie.dev/hadk/v2.1/verification-result.schema.json",
+  "title": "Verification result",
+  "type": "object",
+  "required": ["schema_version", "contract_version", "project_root", "steps", "passed"],
+  "properties": { "schema_version": { "const": "2.1" }, "contract_version": { "type": "string" }, "project_root": { "type": "string" }, "steps": { "type": "array" }, "passed": { "type": "boolean" } }
+}

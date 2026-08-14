@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticbernie.dev/hadk/v2.1/agent-result.schema.json",
+  "title": "Agent result",
+  "type": "object",
+  "required": ["schema_version", "task_id", "scope_version", "status", "changed_files", "commands_executed", "tests", "unresolved_issues", "result_evidence_refs"],
+  "properties": {
+    "schema_version": { "const": "2.1" }, "task_id": { "type": "string" }, "scope_version": { "type": "string" },
+    "status": { "enum": ["completed", "blocked", "partial"] }, "changed_files": { "type": "array" }, "commands_executed": { "type": "array" },
+    "tests": { "type": "array" }, "unresolved_issues": { "type": "array" }, "result_evidence_refs": { "type": "array" }
+  }
+}

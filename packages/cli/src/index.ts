@@ -31,10 +31,13 @@ export function persistRenderFailure(st: StateStore, blocker: string): void {
 import {
   cmdSetup,
   cmdIngest,
+  cmdBriefReview,
+  cmdBriefChange,
   cmdConfigure,
   cmdStrategy,
   cmdIdea,
   cmdIdeaImport,
+  cmdIdeaSelect,
   cmdScope,
   cmdStatus,
   cmdNext,
@@ -53,6 +56,12 @@ import {
   cmdStartupAdaptHackathon,
   cmdStartupStatus,
   cmdStartupNext,
+  cmdArchitecturePlan,
+  cmdHandoffImplement,
+  cmdHandoffImport,
+  cmdVerifyBuild,
+  cmdVerifyDemo,
+  cmdPackageSubmission,
 } from './handlers.js';
 
 const program = new Command();
@@ -86,6 +95,14 @@ program
   .description('Ingest a competition brief from a URL or local file')
   .option('--track <track>', 'preferred track hint')
   .action(async (source, opts) => cmdIngest(store(), source, opts));
+
+const brief = program.command('brief').description('Review evidence-aware competition facts');
+brief.command('review').description('Show extracted facts, provenance, confidence, and blockers').action(async () => cmdBriefReview(store()));
+brief.command('show').description('Alias for brief review').action(async () => cmdBriefReview(store()));
+brief.command('confirm <field>').description('Confirm a reviewed field explicitly')
+  .option('--value <value>', 'value to confirm when the source was unknown')
+  .action(async (field, opts) => cmdBriefChange(store(), field, 'confirm', opts.value));
+brief.command('reject <field>').description('Reject a reviewed field explicitly').action(async (field) => cmdBriefChange(store(), field, 'reject'));
 
 // ─── configure ───────────────────────────────────────────────────────────────
 program
@@ -130,6 +147,11 @@ idea
   .description('Import agent-refined idea candidates from a YAML file')
   .argument('<file>', 'path to the YAML result file')
   .action(async (file) => cmdIdeaImport(store(), file));
+idea
+  .command('select <candidateId>')
+  .description('Explicitly select a reviewed idea candidate')
+  .option('--reason <reason>', 'human selection reason')
+  .action(async (candidateId, opts) => cmdIdeaSelect(store(), candidateId, opts.reason));
 
 // ─── scope ───────────────────────────────────────────────────────────────────
 program
@@ -141,11 +163,12 @@ program
 // ─── scaffold ────────────────────────────────────────────────────────────────
 program
   .command('scaffold')
-  .description('Generate an actual project scaffold from the locked scope')
+  .description('[Deprecated experimental] Generate a project scaffold from the locked scope')
   .option('--profile <profile>', `scaffold profile (${listProfiles().join(' | ')})`)
   .option('--output <dir>', 'output directory', 'prototype')
   .option('--dry-run', 'preview files without writing')
   .option('--force', 'overwrite conflicting files (destructive)')
+  .option('--allow-outside-root', 'explicitly allow output outside the project root')
   .action(async (opts) => {
     const engine = new ScaffoldEngine(store());
     const result = engine.generate({
@@ -153,6 +176,7 @@ program
       output: opts.output,
       dryRun: opts.dryRun,
       force: opts.force,
+      allowOutsideRoot: opts.allowOutsideRoot,
     });
     if (!result.ok) {
       fail(result.error.message, result.error.hint);
@@ -172,6 +196,20 @@ program
       info(`  Health: ${r.plan.health_check}`);
     }
   });
+
+program
+  .command('architecture')
+  .description('Create the v2.1 architecture plan')
+  .command('plan')
+  .description('Write system context, boundaries, data flow, decisions, and verification strategy')
+  .action(async () => cmdArchitecturePlan(store()));
+
+const handoff = program.command('handoff').description('Agent-compatible task handoff, not autonomous execution');
+handoff.command('implement').description('Export canonical context and one packet per implementation unit')
+  .option('--agent <agent>', 'claude-code, codex, or opencode', 'claude-code')
+  .action(async (opts) => cmdHandoffImplement(store(), opts));
+handoff.command('import <resultFile>').description('Import a typed agent result as agent_reported')
+  .action(async (resultFile) => cmdHandoffImport(store(), resultFile));
 
 // ─── status ──────────────────────────────────────────────────────────────────
 program
@@ -240,11 +278,21 @@ program
 // ─── demo ────────────────────────────────────────────────────────────────────
 program
   .command('demo')
-  .description('Validate and prepare the demo path')
+  .description('[Deprecated alias] Use hadk verify demo')
   .action(async () => cmdDemo(store()));
 
+const verify = program.command('verify').description('Run real evidence-backed verification contracts');
+verify.command('build').description('Install, typecheck, test, build, start, and healthcheck prototype/')
+  .action(async () => cmdVerifyBuild(store()));
+verify.command('demo').description('Run reset/seed, start, healthcheck, and the demo journey')
+  .option('--human', 'record explicit human attestation instead of automated verification')
+  .option('--operator <name>', 'human operator name')
+  .option('--checklist <items>', 'semicolon-separated checklist items')
+  .option('--media <path>', 'confined screenshot or recording path')
+  .action(async (opts) => cmdVerifyDemo(store(), opts));
+
 // ─── video ───────────────────────────────────────────────────────────────────
-const video = program.command('video').description('HyperFrames demo video pipeline');
+const video = program.command('video').description('[Deprecated optional] Video planning and HyperFrames integration');
 
 video
   .command('plan')
@@ -255,7 +303,25 @@ video
     if (!loaded.ok) return fail(loaded.error.message);
     const plan = adapter.buildPlan(loaded.value);
     if (!plan.ok) return fail(plan.error.message, plan.error.hint);
+    const storyboard = [
+      `# Demo Video Plan: ${plan.value.title}`,
+      '',
+      `Target duration: ${plan.value.duration_seconds}s`,
+      '',
+      '## Storyboard',
+      ...plan.value.scenes.map((scene) => `- ${scene.order}. **${scene.type}** (${scene.duration_seconds}s): ${scene.narration} — ${scene.visual_description}`),
+      '',
+      '## Asset checklist',
+      ...plan.value.assets.map((asset) => `- [${asset.status === 'available' ? 'x' : ' '}] ${asset.type}: ${asset.path} (${asset.description})`),
+      '',
+      'Optional external video link: _add only after review_',
+      '',
+      'This plan is not a rendered video and does not satisfy media evidence by itself.',
+    ].join('\n');
+    const videoPlan = store().writeTextArtifact('submission', 'video-plan.md', storyboard);
+    if (!videoPlan.ok) return fail(videoPlan.error.message);
     success(`Video plan: ${plan.value.title} (${plan.value.duration_seconds}s, ${plan.value.scenes.length} scenes)`);
+    info(`Storyboard: ${videoPlan.value}`);
   });
 
 // ─── startup discovery ───────────────────────────────────────────────────────
@@ -379,6 +445,11 @@ video
         const mp4 = join(videoDir, 'output', 'submission-video.mp4');
         if (existsSync(mp4)) {
           const size = statSync(mp4).size;
+          if (size === 0) {
+            const blocker = 'Render produced a zero-byte MP4, which is not valid media evidence.';
+            persistRenderFailure(st, blocker);
+            return warn(`${blocker} Render failure persisted in state.`);
+          }
           success(`MP4 rendered: ${mp4} (${(size / 1024).toFixed(1)} KB)`);
           // Update state to reflect successful render
           st.update((s) => {
@@ -438,9 +509,20 @@ program
 // ─── submit ──────────────────────────────────────────────────────────────────
 program
   .command('submit')
-  .description('Prepare and validate the submission package')
+  .description('[Deprecated alias] Use hadk package submission')
   .requiredOption('--repository <url>', 'public repository URL for the submission')
   .action(async (opts) => cmdSubmit(store(), opts));
+
+const pkg = program.command('package').description('Requirements-driven local submission package');
+pkg.command('submission').description('Assemble a local submission package from actual evidence')
+  .option('--repository <url>', 'repository URL')
+  .action(async (opts) => cmdPackageSubmission(store(), 'submission', opts.repository));
+pkg.command('review').description('Review requirement status and blockers')
+  .option('--repository <url>', 'repository URL')
+  .action(async (opts) => cmdPackageSubmission(store(), 'review', opts.repository));
+pkg.command('export').description('Export the local package as markdown')
+  .option('--repository <url>', 'repository URL')
+  .action(async (opts) => cmdPackageSubmission(store(), 'export', opts.repository));
 
 // ─── update ──────────────────────────────────────────────────────────────────
 program
@@ -492,10 +574,13 @@ function printValidationResults(results: import('@hadk/core').ValidationResult[]
 export {
   cmdSetup,
   cmdIngest,
+  cmdBriefReview,
+  cmdBriefChange,
   cmdConfigure,
   cmdStrategy,
   cmdIdea,
   cmdIdeaImport,
+  cmdIdeaSelect,
   cmdScope,
   cmdStatus,
   cmdNext,
@@ -514,6 +599,12 @@ export {
   cmdStartupAdaptHackathon,
   cmdStartupStatus,
   cmdStartupNext,
+  cmdArchitecturePlan,
+  cmdHandoffImplement,
+  cmdHandoffImport,
+  cmdVerifyBuild,
+  cmdVerifyDemo,
+  cmdPackageSubmission,
 } from './handlers.js';
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

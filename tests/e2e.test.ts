@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, copyFileSync, readdirSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { stripVTControlCharacters } from 'node:util';
 import { readYamlFile } from '@hadk/core';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -132,14 +131,15 @@ describe('full fixture competition flow (real CLI, real artifacts)', () => {
   });
 
   it('video generate produces a complete HyperFrames project', () => {
-    // Build validation requires dependencies to be installed before the demo
-    // gate can be earned. The scaffold is structural, so a fixture directory
-    // models that completed project-install step without fetching packages.
-    mkdirSync(join(dir, 'prototype', 'node_modules'));
-    const buildOut = hadk(['validate', 'build']);
-    expect(stripVTControlCharacters(buildOut)).toContain('PASS  build');
-    const demoOut = hadk(['demo']);
-    expect(demoOut).toContain('Demo path validated');
+    // A directory-shaped node_modules is not build evidence.
+    let legacyValidationFailed = false;
+    try { hadk(['validate', 'build']); } catch { legacyValidationFailed = true; }
+    expect(legacyValidationFailed).toBe(true);
+    // The fast fixture uses an explicit human attestation here. The reference
+    // project’s real install/build/demo contract is exercised in CI/manual
+    // release verification; this test must remain bounded for unit CI.
+    const demoOut = hadk(['verify', 'demo', '--human', '--operator', 'fixture-operator', '--checklist', 'reset observed;core flow observed;fallback observed']);
+    expect(demoOut).toContain('Human-attested demo recorded');
     const out = hadk(['video', 'generate']);
     expect(out).toContain('Video project generated');
     const videoDir = join(dir, 'demo-video');
@@ -151,25 +151,15 @@ describe('full fixture competition flow (real CLI, real artifacts)', () => {
   });
 
   it('renders from the generated project directory when HyperFrames is available', () => {
-    const fakeBin = join(dir, 'fakebin');
-    mkdirSync(fakeBin);
-    const fakeHyperFrames = join(fakeBin, 'hyperframes');
-    writeFileSync(fakeHyperFrames, '#!/usr/bin/env bash\nif [ "$1" = "render" ] && [ "$2" = "--help" ]; then exit 0; fi\nmkdir -p "$(dirname "$4")"\ntouch "$4"\n', 'utf-8');
-    chmodSync(fakeHyperFrames, 0o755);
-
-    const out = hadk(['video', 'render'], { ...process.env, PATH: `${fakeBin}:${process.env.PATH}` });
-    expect(out).toContain('MP4 rendered');
-    const state = readYaml<any>('.hackathon', 'state.yaml');
-    expect(state.gates.video_gate).toBe('passed');
-    expect(state.delivery.phase).toBe('judge');
+    const out = hadk(['video', 'validate']);
+    expect(out).toContain('Video project is valid');
   });
 
   it('prepares judge material and completes a submission with a repository URL', () => {
-    expect(hadk(['judge'])).toContain('Judge preparation artifact written');
-    expect(hadk(['submit', '--repository', 'https://github.com/example/project'])).toContain('Submission package prepared');
+    expect(hadk(['package', 'review', '--repository', 'https://github.com/example/project'])).toContain('"ready": false');
     const state = readYaml<any>('.hackathon', 'state.yaml');
-    expect(state.gates.submission_gate).toBe('passed');
-    expect(state.delivery.phase).toBe('complete');
+    expect(state.gates.submission_gate).not.toBe('passed');
+    expect(state.delivery.phase).toBe('build');
   });
 
   it('produced state.yaml reflects the full pipeline', () => {

@@ -17,11 +17,12 @@ import {
   hadkError,
   nowIso,
   stringifyYaml,
+  safeResolvePath,
 } from '@hadk/core';
 import { StateStore } from '@hadk/state-store';
 import { getProfile, listProfiles, type ProfileDefinition } from './profiles.js';
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 
 export { listProfiles };
@@ -35,6 +36,7 @@ export interface ScaffoldOptions {
   dryRun?: boolean;
   force?: boolean;
   installDeps?: boolean;
+  allowOutsideRoot?: boolean;
 }
 
 export interface ScaffoldResult {
@@ -80,7 +82,13 @@ export class ScaffoldEngine {
     }
 
     const projectName = this.deriveProjectName(state);
-    const outputDir = resolve(this.store.projectRoot, options.output ?? 'prototype');
+    const outputCheck = safeResolvePath(this.store.projectRoot, options.output ?? 'prototype', { allowOutsideRoot: options.allowOutsideRoot });
+    if (!outputCheck.ok) return err(outputCheck.error);
+    const outputDir = outputCheck.value;
+    const invalidFeature = state.scope.mvp_features.find((feature) => !/^[A-Za-z0-9_-]+$/.test(feature.id));
+    if (invalidFeature) {
+      return err(hadkError('FEATURE_ID_INVALID', `Feature id "${invalidFeature.id}" contains unsupported path characters.`));
+    }
 
     // Feature-to-component mapping
     const featureMapping = this.buildFeatureMapping(state, profile);
@@ -125,7 +133,11 @@ export class ScaffoldEngine {
     const conflicts: string[] = [];
 
     for (const file of plan.files) {
-      const fullPath = join(plan.output_dir, file.path);
+      const pathCheck = safeResolvePath(plan.output_dir, file.path, {
+        allowSecrets: file.path === '.env.example' || file.path.endsWith('/.env.example') || file.path === '.env.local' || file.path.endsWith('/.env.local') || file.path === 'backend/.env',
+      });
+      if (!pathCheck.ok) return err(hadkError('SCAFFOLD_PATH_DENIED', pathCheck.error.message));
+      const fullPath = pathCheck.value;
 
       if (existsSync(fullPath) && !options.force) {
         // Conflict detection: never overwrite user code without explicit approval
@@ -162,7 +174,9 @@ export class ScaffoldEngine {
         health_check: plan.health_check,
         features: plan.features,
       };
-      const metaPath = join(plan.output_dir, 'hadk.project.yaml');
+      const metaCheck = safeResolvePath(plan.output_dir, 'hadk.project.yaml');
+      if (!metaCheck.ok) return err(hadkError('SCAFFOLD_PATH_DENIED', metaCheck.error.message));
+      const metaPath = metaCheck.value;
       if (!existsSync(metaPath) || options.force) {
         writeFileSync(metaPath, stringifyYaml(projectMeta), 'utf-8');
         filesWritten.push('hadk.project.yaml');

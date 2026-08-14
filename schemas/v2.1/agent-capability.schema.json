@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticbernie.dev/hadk/v2.1/agent-capability.schema.json",
+  "title": "Agent capability",
+  "type": "object",
+  "required": ["agent", "capabilities", "adapter_version", "execution_supported"],
+  "properties": { "agent": { "enum": ["claude-code", "codex", "opencode"] }, "capabilities": { "type": "array" }, "adapter_version": { "type": "string" }, "execution_supported": { "const": false } }
+}

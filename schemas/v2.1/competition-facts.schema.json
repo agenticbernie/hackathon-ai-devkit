@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticbernie.dev/hadk/v2.1/competition-facts.schema.json",
+  "title": "Competition facts",
+  "type": "object",
+  "required": ["schema_version", "facts", "raw_source_ref", "status"],
+  "properties": {
+    "schema_version": { "const": "2.1" },
+    "facts": { "type": "array", "items": { "type": "object", "required": ["id", "field", "value", "fact_type", "confidence", "source_ref", "unresolved_questions"], "properties": { "id": { "type": "string" }, "field": { "type": "string" }, "value": {}, "fact_type": { "enum": ["extracted", "inferred", "user_confirmed", "unknown", "rejected"] }, "confidence": { "enum": ["low", "medium", "high"] }, "source_ref": { "type": "string" }, "excerpt": { "type": ["string", "null"] }, "locator": { "type": ["string", "null"] }, "unresolved_questions": { "type": "array", "items": { "type": "string" } } } } },
+    "raw_source_ref": { "type": "string" },
+    "status": { "enum": ["needs_review", "confirmed", "blocked"] },
+    "blockers": { "type": "array", "items": { "type": "string" } }
+  }
+}

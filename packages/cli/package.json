@@ -1,6 +1,6 @@
 {
   "name": "@hadk/cli",
-  "version": "2.0.7",
+  "version": "2.1.0",
   "description": "hadk — the AI-native Competition Engineering Harness CLI",
   "type": "module",
   "main": "dist/index.js",
@@ -26,6 +26,11 @@
     "@hadk/validators": "workspace:*",
     "@hadk/hyperframes-adapter": "workspace:*",
     "@hadk/agent-adapters": "workspace:*",
+    "@hadk/competition-intelligence": "workspace:*",
+    "@hadk/planning": "workspace:*",
+    "@hadk/agent-bridge": "workspace:*",
+    "@hadk/verification": "workspace:*",
+    "@hadk/submission": "workspace:*",
     "ajv": "^6.15.0",
     "commander": "^12.1.0",
     "picocolors": "^1.1.1"

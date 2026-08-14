@@ -23,6 +23,12 @@
     { "path": "packages/validators" },
     { "path": "packages/hyperframes-adapter" },
     { "path": "packages/agent-adapters" },
+    { "path": "packages/competition-intelligence" },
+    { "path": "packages/planning" },
+    { "path": "packages/agent-bridge" },
+    { "path": "packages/verification" },
+    { "path": "packages/submission" },
+    { "path": "packages/workspace" },
     { "path": "packages/cli" }
   ],
   "include": ["tests/**/*.ts"]

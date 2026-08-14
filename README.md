@@ -1,14 +1,15 @@
 # Hackathon AI DevKit (HADK)
 
-**Version: 2.0.7**
+**Version: 2.1.0**
 
-> **Turn any competition brief into a winning strategy, scoped prototype,
-> executable project scaffold, reliable demo, and submission-ready package.**
+> **Competition Delivery Control Plane for teams and coding agents.**
 
-HADK is an **AI-native Competition Engineering Harness**. It is not a folder of
-prompts: it is a working CLI (`hadk`) with persistent state, validation gates,
-a real scaffold engine, a demo-video pipeline, and multi-agent support — plus
-the original standalone skills that started the project.
+HADK helps a team move from a competition brief to reviewed requirements,
+strategy, explicit idea selection, locked MVP scope, architecture, an
+agent-compatible handoff, real build/demo verification, and a local
+submission package. It is not an autonomous winning-project generator,
+generic application generator, multi-agent runtime, video renderer, startup
+research platform, or automatic submission bot.
 
 ---
 
@@ -18,7 +19,8 @@ HADK takes a competition brief (a URL or a markdown file) and drives a
 disciplined pipeline from idea to submission:
 
 ```text
-    ingest → strategy → idea → scope → scaffold → build → demo → video → judge → submission
+    brief → review → strategy → idea selection → scope → architecture
+    → handoff → real verification → demo verification → package review
 
 Startup discovery can run independently of `selected-idea`:
 
@@ -60,7 +62,7 @@ verifies the registry against the files on disk.
 ## 4. One-command installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/9a23e2d84f595acd03e93de6a8a2bf2054f115ae/install.sh | bash
 ```
 
 The installer is **idempotent** and **non-destructive**: it detects Node ≥ 20,
@@ -74,13 +76,19 @@ command. See the [installer & security guide](docs/guides/installer-security.md)
 mkdir my-competition && cd my-competition
 hadk setup --team-size 3 --team-skills "ai,fullstack,design"
 hadk ingest /path/to/brief.md
-hadk strategy --mode futuristic --taste auto
+hadk brief show
+hadk brief confirm competition_name
+hadk strategy --mode balanced --taste auto
 hadk idea
+hadk idea select <candidate-id>
 hadk scope
-hadk scaffold --profile web-ai-fullstack
+hadk architecture plan
+hadk handoff implement --agent claude-code
+hadk verify build
+hadk verify demo
+hadk package submission
 hadk status
-hadk validate all
-hadk video generate
+hadk package review
 ```
 
 Then build and run the generated prototype:
@@ -98,14 +106,14 @@ including separate [hackathon](wiki/hackathon/README.md) and
 
 ## 6. Three strategy modes
 
-`hadk strategy --mode <mode>` reweights idea scoring toward a winning
-philosophy:
+`hadk strategy --mode <mode>` reweights decision aids. Scores include rationale
+and confidence and are not objective truth:
 
 | Mode | Wins on | Use when |
 |---|---|---|
-| `conservative` | Execution & reliability | Short time, risky integrations. |
-| `realistic` | Value & polish | General hackathons, balanced rubric. |
-| `futuristic` | Vision & memorability | AI/infra events where being remembered matters. |
+| `execution-first` | Execution & reliability | Short time, risky integrations. |
+| `balanced` | Value, fit, and proof | Default planning when evidence is mixed. |
+| `differentiation-first` | Memorability with proof | A demonstrated mechanism can support it. |
 
 Each mode's scoring weights always sum to 1.0 (validated). See
 [docs/guides/strategy-modes.md](docs/guides/strategy-modes.md).
@@ -119,11 +127,11 @@ strategy mode, competition type); `--taste user` lets you supply your own. The
 
 ## 8. Scope-driven scaffold
 
-`hadk scope` locks an MVP contract: a core demo flow, MVP features (each
-justified by demo or rubric, with hour estimates and fallbacks), deferred
-features, a primary wow moment, external dependencies with fallbacks, and a
-time budget. `hadk scaffold` then generates an **actual project** from that
-locked scope using a data-driven profile
+`hadk scope` locks an MVP contract: acceptance criteria, owners, hour budgets,
+fallbacks, demo steps, verification methods, cut-list, reset/seed strategy,
+and explicit risk/buffer budgets. `hadk architecture plan` then records system
+boundaries and verification strategy. The old `hadk scaffold` command remains
+deprecated experimental functionality and is not the v2.1 core path.
 ([ADR-004](docs/architecture/decisions/ADR-004-data-driven-scaffold.md)).
 
 Three profiles are implemented: `web-ai-fullstack`, `web-ai-split`, and
@@ -145,10 +153,14 @@ submission) are persisted alongside state.
 | Command | Description |
 |---|---|
 | `hadk setup` | Initialize `.hackathon/`, detect environment, install agent adapters. |
-| `hadk ingest <source>` | Ingest a brief from a URL or file. |
+| `hadk ingest <source>` | Capture a brief as untrusted data and extract reviewable facts. |
+| `hadk brief review` | Show facts, excerpts, confidence, and blockers. |
+| `hadk brief confirm <field>` | Confirm one fact as explicit user evidence. |
+| `hadk brief reject <field>` | Reject one fact without altering the raw source. |
 | `hadk configure` | Update team and competition configuration. |
 | `hadk strategy` | Select strategy mode and taste profile. |
-| `hadk idea` | Generate, score, rank, and select candidate ideas. |
+| `hadk idea` | Generate unverified heuristic drafts or export an agent handoff. |
+| `hadk idea select <id>` | Explicitly select a reviewed candidate. |
  | `hadk startup research` | Map market pain points before solution ideation. |
 | `hadk startup scorecard` | Rank pain points with transparent 1–5 evidence-aware scores. |
 | `hadk startup deep-dive <id>` | Investigate one pain point and seek disconfirming evidence. |
@@ -157,23 +169,34 @@ submission) are persisted alongside state.
 | `hadk startup next` | Recommend the next valid startup discovery action. |
 | `hadk startup adapt-hackathon` | Map hackathon skills to startup workflows. |
 | `hadk scope` | Create and lock the MVP scope (`--unlock` to reopen). |
-| `hadk scaffold` | Generate a project scaffold (`--profile`, `--dry-run`, `--force`). |
+| `hadk architecture plan` | Create the architecture contract. |
+| `hadk handoff implement` | Export canonical context and typed task packets. |
+| `hadk handoff import <file>` | Import an agent-reported result without claiming verification. |
+| `hadk scaffold` | Deprecated experimental scaffold generation. |
 | `hadk status` | Show phase, gates, deadline mode, and next action (`--json`). |
 | `hadk next` | Print the single correct next command. |
 | `hadk checkpoint` | Snapshot state (`--label`). |
 | `hadk rollback` | Restore a checkpoint. |
 | `hadk replan` | Unlock scope and re-plan (`--reason`). |
-| `hadk validate [target]` | Run validation gates (`state\|registry\|scope\|scaffold\|video\|all\|…`). |
-| `hadk demo` | Validate and prepare the demo path. |
+| `hadk validate [target]` | Run structural and evidence checks. |
+| `hadk verify build` | Actually install, typecheck, test, build, start, and healthcheck. |
+| `hadk verify demo` | Run the configured demo journey or record human attestation. |
 | `hadk video <plan\|generate\|preview\|render\|validate>` | HyperFrames demo-video pipeline. |
 | `hadk judge` | Prepare judge Q&A artifacts. |
-| `hadk submit` | Assemble the submission package. |
+| `hadk package submission` | Assemble a requirements-driven local package. |
+| `hadk package review` | Review mandatory evidence and blockers. |
+| `hadk package export` | Export the package locally; no external submission occurs. |
 | `hadk doctor` | Diagnose the environment. |
 | `hadk update` | Show how to update the installation. |
 
-## 11. HyperFrames video workflow
+## 11. Optional video planning
 
-`hadk video generate` produces a complete `demo-video/` project: a storyboard
+The v2.1 core uses a demo video plan, storyboard markdown, and asset checklist.
+`hadk video generate` is a deprecated optional HyperFrames integration and does
+not advance a v2.1 package gate. A zero-byte or merely present MP4 is never
+accepted as evidence.
+
+`hadk video generate` produces a legacy `demo-video/` project: a storyboard
 derived from the demo flow, an asset manifest (with honest
 available/missing/placeholder statuses), and an HTML/CSS/JS composition you can
 preview in a browser. Rendering to MP4 requires the HyperFrames CLI; if it is
@@ -222,12 +245,11 @@ state and scope:
 
 ## 16. Current limitations
 
-- Idea generation and brief parsing use deterministic heuristics; the coding
-  agent refines artifacts using the corresponding skills. They are a starting
-  point, not a replacement for team judgment.
+- Heuristic ideas and fact extraction are reviewable starting points, not
+  confirmed competition truth or a replacement for team judgment.
 - Rendering a demo MP4 requires the external HyperFrames CLI; without it, only
   the (valid, previewable) composition is produced.
-- Startup-contest skills are beta.
+- Startup-contest skills remain available but are outside the v2.1 core path.
 - Startup scorecards are prioritization tools, not proof of product-market fit. Missing evidence and confidence are retained in every score.
 - The installer targets POSIX/macOS/Linux developer machines with Node ≥ 20.
 - Skill counts and metadata are validated against `manifest.yaml` by
@@ -256,6 +278,10 @@ built `dist`, so `pnpm build` must precede `pnpm test`.
 - CI templates that run the full fixture competition on every PR.
 - Promotion of startup-contest skills from beta to stable.
 - Real venture research integrations with human-reviewed source extraction.
+
+Explicitly outside the v2.1 core path: autonomous multi-agent execution,
+universal scaffold profiles, HyperFrames rendering, startup research, and
+automatic external submission.
 - A marketplace distribution channel for skills.
 
 ---

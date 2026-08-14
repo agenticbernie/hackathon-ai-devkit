@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticbernie.dev/hadk/v2.1/strategy.schema.json",
+  "title": "Strategy",
+  "type": "object",
+  "required": ["schema_version", "mode", "dimensions", "intended_use", "risks", "scores_are_decision_aids"],
+  "properties": {
+    "schema_version": { "const": "2.1" },
+    "mode": { "enum": ["execution-first", "balanced", "differentiation-first"] },
+    "dimensions": { "type": "object" },
+    "intended_use": { "type": "string" },
+    "risks": { "type": "array", "items": { "type": "string" } },
+    "scores_are_decision_aids": { "const": true }
+  }
+}

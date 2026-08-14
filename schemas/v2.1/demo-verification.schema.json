@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticbernie.dev/hadk/v2.1/demo-verification.schema.json",
+  "title": "Demo verification",
+  "type": "object",
+  "required": ["schema_version", "mode", "reset_seed", "journey", "expected_output", "fallback_behavior", "automated", "evidence_refs"],
+  "properties": { "schema_version": { "const": "2.1" }, "mode": { "enum": ["automated", "human-attested"] }, "reset_seed": { "type": "string" }, "journey": { "type": "array" }, "expected_output": { "type": "array" }, "fallback_behavior": { "type": "string" }, "automated": { "type": "boolean" }, "evidence_refs": { "type": "array" } }
+}

@@ -136,6 +136,25 @@ export function validateRegistry(hadkRoot: string): ValidationResult {
   }
 
   issues.push(info('REGISTRY_COUNT', `${skillNames.length} skills registered.`));
+  const schemaRegistryPath = join(hadkRoot, 'schemas', 'v2.1', 'registry.json');
+  if (!existsSync(schemaRegistryPath)) {
+    issues.push(error('SCHEMA_REGISTRY_MISSING', 'schemas/v2.1/registry.json is missing.'));
+  } else {
+    try {
+      const schemaRegistry = JSON.parse(readFileSync(schemaRegistryPath, 'utf8')) as { schemas?: Record<string, string> };
+      for (const [name, schemaPath] of Object.entries(schemaRegistry.schemas ?? {})) {
+        const absolute = join(hadkRoot, schemaPath);
+        if (!existsSync(absolute)) issues.push(error('CONTRACT_SCHEMA_MISSING', `v2.1 contract schema "${name}" is missing: ${schemaPath}`));
+        else {
+          try { JSON.parse(readFileSync(absolute, 'utf8')); }
+          catch { issues.push(error('CONTRACT_SCHEMA_INVALID', `v2.1 contract schema "${name}" is not valid JSON.`)); }
+        }
+      }
+      issues.push(info('SCHEMA_REGISTRY_COUNT', `${Object.keys(schemaRegistry.schemas ?? {}).length} v2.1 contract schemas registered.`));
+    } catch {
+      issues.push(error('SCHEMA_REGISTRY_INVALID', 'schemas/v2.1/registry.json is not valid JSON.'));
+    }
+  }
   return result('registry', issues);
 }
 
@@ -188,7 +207,7 @@ export function validateCompetition(state: CompetitionState): ValidationResult {
   return result('competition', issues);
 }
 
-export function validateIdea(state: CompetitionState): ValidationResult {
+export function validateIdea(state: CompetitionState, store?: StateStore): ValidationResult {
   const issues: ValidationIssue[] = [];
 
   if (!state.strategy.selected_idea) {
@@ -211,6 +230,12 @@ export function validateIdea(state: CompetitionState): ValidationResult {
   const ideaArtifact = state.strategy.selected_idea;
   if (!ideaArtifact) {
     issues.push(error('IDEA_ARTIFACT_MISSING', 'Selected idea artifact not found.'));
+  }
+  if (store && !['conservative', 'realistic', 'futuristic'].includes(state.strategy.mode)) {
+    const selected = store.readArtifact<any>('ideas', 'selected.yaml');
+    if (!selected.ok || !['human_attested', 'verified', 'agent_reported'].includes(selected.value?.verification_status) || !selected.value?.evidence_refs?.length) {
+      issues.push(error('IDEA_NOT_VERIFIED', 'The selected idea lacks explicit human or validated-agent evidence.'));
+    }
   }
 
   return result('idea', issues);
@@ -312,7 +337,7 @@ export function validateScaffold(store: StateStore): ValidationResult {
   return result('scaffold', issues);
 }
 
-export function validateDemo(state: CompetitionState): ValidationResult {
+export function validateDemo(state: CompetitionState, store?: StateStore): ValidationResult {
   const issues: ValidationIssue[] = [];
 
   if (state.scope.demo_flow.length === 0) {
@@ -323,9 +348,14 @@ export function validateDemo(state: CompetitionState): ValidationResult {
     issues.push(error('DEMO_BLOCKED', 'Demo path has unresolved blockers.'));
   }
 
-  // Deterministic demo state: check for reset capability
   if (state.delivery.demo_status === 'not_started') {
     issues.push(error('DEMO_NOT_VALIDATED', 'Demo has not been validated end-to-end.'));
+  }
+  if (state.delivery.demo_status === 'validated' && store) {
+    const artifact = store.readArtifact<any>('demo', 'verification.yaml');
+    if (!artifact.ok || !artifact.value?.evidence_refs?.length || !['automated', 'human-attested'].includes(artifact.value.mode)) {
+      issues.push(error('DEMO_EVIDENCE_MISSING', 'Demo status is validated but no automated or human-attested verification evidence exists.'));
+    }
   }
 
   // External dependencies have fallback
@@ -366,6 +396,13 @@ export function validateVideo(store: StateStore): ValidationResult {
   if (loaded.value.delivery.video_status !== 'rendered') {
     issues.push(error('VIDEO_NOT_RENDERED', 'Video has not been rendered and verified. Run `hadk video render`.'));
   }
+  try {
+    if (existsSync(join(videoDir, 'output', 'submission-video.mp4')) && readFileSync(join(videoDir, 'output', 'submission-video.mp4')).length === 0) {
+      issues.push(error('VIDEO_EMPTY', 'Zero-byte MP4 is not valid media evidence.'));
+    }
+  } catch {
+    issues.push(error('VIDEO_UNREADABLE', 'Rendered media could not be read.'));
+  }
 
   return result('video', issues);
 }
@@ -385,9 +422,11 @@ export function validateSubmission(state: CompetitionState, store: StateStore): 
   if (submissionArtifacts.length === 0) {
     issues.push(error('NO_SUBMISSION_ARTIFACTS', 'No submission artifacts prepared. Run `hadk submit`.'));
   }
-
-  if (state.delivery.video_status === 'not_started') {
-    issues.push(error('NO_VIDEO', 'No rendered video artifact for submission.'));
+  const packageArtifact = store.readArtifact<any>('submission', 'package.yaml');
+  if (!packageArtifact.ok) {
+    issues.push(error('NO_REQUIREMENTS_PACKAGE', 'No requirements-driven submission package exists.'));
+  } else if (!packageArtifact.value.ready) {
+    issues.push(error('SUBMISSION_REQUIREMENTS_BLOCKED', 'One or more mandatory submission requirements lack evidence.'));
   }
 
   return result('submission', issues);
@@ -419,7 +458,7 @@ export function runValidator(name: ValidatorName, store: StateStore, hadkRoot: s
     case 'competition':
       return state ? validateCompetition(state) : result('competition', [error('NO_STATE', 'State not initialized.')]);
     case 'idea':
-      return state ? validateIdea(state) : result('idea', [error('NO_STATE', 'State not initialized.')]);
+      return state ? validateIdea(state, store) : result('idea', [error('NO_STATE', 'State not initialized.')]);
     case 'scope':
       return state ? validateScope(state) : result('scope', [error('NO_STATE', 'State not initialized.')]);
     case 'scaffold':
@@ -427,7 +466,7 @@ export function runValidator(name: ValidatorName, store: StateStore, hadkRoot: s
     case 'build':
       return validateBuild(store);
     case 'demo':
-      return state ? validateDemo(state) : result('demo', [error('NO_STATE', 'State not initialized.')]);
+      return state ? validateDemo(state, store) : result('demo', [error('NO_STATE', 'State not initialized.')]);
     case 'video':
       return validateVideo(store);
     case 'submission':
@@ -446,12 +485,22 @@ export function validateBuild(store: StateStore): ValidationResult {
     return result('build', issues);
   }
 
-  const hasNodeModules = existsSync(join(protoDir, 'node_modules'));
-  if (!hasNodeModules) {
-    issues.push(error('DEPS_NOT_INSTALLED', 'node_modules not found — run the install command from hadk.project.yaml.'));
+  const verification = store.readArtifact<any>('build', 'verification.yaml');
+  if (!verification.ok) {
+    issues.push(error('BUILD_NOT_VERIFIED', 'No real build verification evidence exists. Run `hadk verify build`.'));
+    return result('build', issues);
   }
-
-  issues.push(info('BUILD_MANUAL', 'Full build validation (install, typecheck, test, startup, health) requires running the project. See hadk.project.yaml for commands.'));
+  if (!verification.value.passed) {
+    issues.push(error('BUILD_VERIFICATION_FAILED', 'Install, typecheck, test, build, startup, or healthcheck failed.'));
+  }
+  for (const step of verification.value.steps ?? []) {
+    if (['install', 'typecheck', 'test', 'build', 'start', 'healthcheck'].includes(step.kind) && step.status !== 'passed') {
+      issues.push(error('REQUIRED_STEP_FAILED', `Required verification step "${step.step_id}" was ${step.status}.`, step.step_id));
+    }
+  }
+  if (!(verification.value.evidence_refs ?? []).length) {
+    issues.push(error('NO_BUILD_EVIDENCE', 'Build verification has no persisted evidence references.'));
+  }
   return result('build', issues);
 }
 

@@ -4,8 +4,8 @@
 
 import type { DeadlineMode, Phase, StrategyMode } from './types.js';
 
-export const SCHEMA_VERSION = '1.0';
-export const HADK_VERSION = '2.0.7';
+export const SCHEMA_VERSION = '2.1';
+export const HADK_VERSION = '2.1.0';
 export const STATE_DIR = '.hackathon';
 export const STATE_FILE = 'state.yaml';
 export const CONFIG_FILE = 'config.yaml';
@@ -42,9 +42,19 @@ export const GATE_FOR_PHASE: Partial<Record<Phase, keyof import('./types.js').Co
 
 // ─── Strategy Modes ──────────────────────────────────────────────────────────
 
-export const STRATEGY_MODES: StrategyMode[] = ['conservative', 'realistic', 'futuristic'];
+export const STRATEGY_MODES: StrategyMode[] = [
+  'execution-first',
+  'balanced',
+  'differentiation-first',
+  // Compatibility aliases, deprecated in v2.1.
+  'conservative',
+  'realistic',
+  'futuristic',
+];
 
-export const SCORING_WEIGHTS: Record<StrategyMode, Record<string, number>> = {
+export const V21_STRATEGY_MODES = ['execution-first', 'balanced', 'differentiation-first'] as const;
+
+export const SCORING_WEIGHTS: Record<string, Record<string, number>> = {
   conservative: {
     build_feasibility: 0.25,
     demo_reliability: 0.2,
@@ -70,6 +80,27 @@ export const SCORING_WEIGHTS: Record<StrategyMode, Record<string, number>> = {
     strategic_upside: 0.1,
     build_feasibility: 0.1,
   },
+  'execution-first': {
+    feasibility: 0.3,
+    demo_reliability: 0.25,
+    rubric_alignment: 0.2,
+    implementation_cost: 0.15,
+    fallback_safety: 0.1,
+  },
+  balanced: {
+    problem_value: 0.2,
+    rubric_alignment: 0.2,
+    differentiation: 0.2,
+    feasibility: 0.2,
+    demo_proof: 0.2,
+  },
+  'differentiation-first': {
+    differentiation: 0.3,
+    memorability: 0.2,
+    rubric_alignment: 0.2,
+    core_mechanism_proof: 0.2,
+    feasibility: 0.1,
+  },
 };
 
 export const FUTURISTIC_HARD_CONSTRAINTS = {
@@ -80,6 +111,30 @@ export const FUTURISTIC_HARD_CONSTRAINTS = {
 } as const;
 
 export const DEFAULT_STRATEGY_MODE: StrategyMode = 'realistic';
+
+export const V21_SCORING_WEIGHTS: Record<(typeof V21_STRATEGY_MODES)[number], Record<string, number>> = {
+  'execution-first': {
+    feasibility: 0.3,
+    demo_reliability: 0.25,
+    rubric_alignment: 0.2,
+    implementation_cost: 0.15,
+    fallback_safety: 0.1,
+  },
+  balanced: {
+    problem_value: 0.2,
+    rubric_alignment: 0.2,
+    differentiation: 0.2,
+    feasibility: 0.2,
+    demo_proof: 0.2,
+  },
+  'differentiation-first': {
+    differentiation: 0.3,
+    memorability: 0.2,
+    rubric_alignment: 0.2,
+    core_mechanism_proof: 0.2,
+    feasibility: 0.1,
+  },
+};
 
 // ─── Deadline Policy ─────────────────────────────────────────────────────────
 

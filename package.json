@@ -1,8 +1,8 @@
 {
   "name": "hackathon-ai-devkit",
-  "version": "2.0.7",
+  "version": "2.1.0",
   "private": true,
-  "description": "AI-native Competition Engineering Harness — turn any competition brief into a winning strategy, scoped prototype, executable project scaffold, reliable demo, and submission-ready package.",
+  "description": "HADK v2.1 Competition Delivery Control Plane",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "lint": "eslint \"packages/**/*.ts\" \"tests/**/*.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "validate:schemas": "node scripts/validate-v21-schemas.mjs",
     "validate": "node packages/cli/dist/index.js validate registry",
     "clean": "pnpm -r run clean"
   },
