@@ -104,7 +104,7 @@ still previewable in a browser.
 ```bash
 hadk demo      # validate the demo path
 hadk judge     # generate judge Q&A prep
-hadk submit    # assemble the submission package
+hadk package submission    # assemble the local submission package
 ```
 
 ## Tips

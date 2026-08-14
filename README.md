@@ -42,7 +42,7 @@ and the submission must ship.
   free-for-all.
 - **Solo builders** who need scope discipline and a reliable demo path.
 - **AI coding agents** (Claude Code, Codex, OpenCode) that need a structured
-  protocol and machine-checkable artifacts to operate autonomously.
+  protocol and machine-checkable artifacts to operate with explicit approvals.
 - **Mentors and organizers** who want a transparent, inspectable workflow.
 
 ## 3. Standalone skills vs. full harness
@@ -288,4 +288,4 @@ automatic external submission.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache License 2.0 — see [LICENSE](LICENSE).

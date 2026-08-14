@@ -39,7 +39,7 @@
 - All 5 templates
 - All 4 playbooks (will be extended, not replaced)
 - YAML frontmatter convention (`name`, `description`)
-- LICENSE (MIT)
+- LICENSE (Apache License 2.0)
 
 ## Migration Risks
 

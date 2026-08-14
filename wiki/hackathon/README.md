@@ -32,9 +32,13 @@ mkdir my-hackathon
 cd my-hackathon
 hadk setup --team-size 3 --team-skills "ai,fullstack,design"
 hadk ingest /path/to/brief.md
-hadk strategy --mode realistic --taste auto
+hadk brief review
+hadk strategy --mode balanced --taste auto
 hadk idea
+hadk idea select <candidate-id>
 hadk scope
 ```
 
 Continue with [the complete workflow](workflow.md).
+
+HADK is distributed under the [Apache License 2.0](../../LICENSE).

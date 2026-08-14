@@ -30,3 +30,8 @@ hadk validate registry
 
 The canonical skill registry is `manifest.yaml`. Skills and their JSON contracts
 are stored under `skills/` and `schemas/skills/`.
+
+## License
+
+HADK is distributed under the Apache License 2.0. See the repository
+[LICENSE](../LICENSE) for the full terms.

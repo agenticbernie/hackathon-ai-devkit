@@ -31,14 +31,17 @@ The corresponding skills are:
 When the venture is ready to build a proof, use the shared hackathon workflow:
 
 ```bash
-hadk strategy --mode realistic
+hadk strategy --mode balanced
 hadk idea
+hadk idea select <candidate-id>
 hadk scope
+hadk architecture plan
+hadk verify build
 hadk scaffold --profile web-ai-fullstack
-hadk validate build
-hadk demo
+hadk verify demo
 hadk judge
-hadk submit --repository https://github.com/org/project
+hadk package submission --repository https://github.com/org/project
+hadk package review
 ```
 
 The prototype should prove one mechanism. Do not present a demo as customer

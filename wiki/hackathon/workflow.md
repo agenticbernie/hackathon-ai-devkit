@@ -13,7 +13,8 @@ available package managers, git, and supported coding agents.
 
 ```bash
 hadk ingest ./brief.md
-hadk ingest https://example.com/competition-brief --track "AI"
+hadk brief review
+hadk brief confirm competition_name
 ```
 
 The result is written to:
@@ -29,8 +30,9 @@ successful extraction.
 ## 3. Choose strategy and idea
 
 ```bash
-hadk strategy --mode realistic --taste auto
+hadk strategy --mode balanced --taste auto
 hadk idea
+hadk idea select <candidate-id>
 ```
 
 Strategy modes:
@@ -65,12 +67,16 @@ Replanning creates a checkpoint and resets downstream gates.
 ## 5. Scaffold and build
 
 ```bash
+hadk architecture plan
+hadk handoff implement --agent claude-code
+hadk verify build
 hadk scaffold --profile web-ai-fullstack
 cd prototype
 pnpm install
 pnpm build
 cd ..
-hadk validate build
+hadk package submission
+hadk package review
 ```
 
 The scaffold engine is non-destructive by default. Use `--dry-run` to preview a
@@ -79,7 +85,7 @@ scaffold. Use `--force` only when intentionally overwriting conflicts.
 ## 6. Prepare demo and video
 
 ```bash
-hadk demo
+hadk verify demo
 hadk video generate
 hadk video preview
 hadk video render
@@ -92,8 +98,9 @@ render as blocked and keeps the previewable composition.
 
 ```bash
 hadk judge
-hadk submit --repository https://github.com/org/project
+hadk package submission --repository https://github.com/org/project
+hadk package review
 ```
 
-Review the generated artifacts before submitting. The submission gate requires
-the expected competition, pitch, video, and repository information.
+Review the generated artifacts before any external submission. HADK only creates
+a local package and never submits to external systems.
