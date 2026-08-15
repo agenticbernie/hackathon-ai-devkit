@@ -46,7 +46,7 @@ work. New skills were *added*; none were removed or renamed (see
 Install the full harness:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/215f0def5e1cfbdb51be9f1ee8b0e075db09fdfe/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/33da63aba406b9d10f032ae7db0ccf5412b9246a/install.sh | bash
 ```
 
 Then in a project directory:

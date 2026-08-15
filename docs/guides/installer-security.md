@@ -3,7 +3,7 @@
 The full harness is installed with:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/215f0def5e1cfbdb51be9f1ee8b0e075db09fdfe/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/33da63aba406b9d10f032ae7db0ccf5412b9246a/install.sh | bash
 ```
 
 This guide explains what the installer does, how to control it, and the safety
@@ -86,7 +86,7 @@ it accordingly:
 For CI, combine a pinned version with non-interactive mode:
 
 ```bash
-HADK_VERSION=215f0def5e1cfbdb51be9f1ee8b0e075db09fdfe HADK_NON_INTERACTIVE=1 bash install.sh
+HADK_VERSION=33da63aba406b9d10f032ae7db0ccf5412b9246a HADK_NON_INTERACTIVE=1 bash install.sh
 ```
 
 To calculate the archive checksum for a checked-out revision:
