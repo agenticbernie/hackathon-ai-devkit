@@ -3,7 +3,7 @@
 # HADK updater — pulls the latest harness and rebuilds the CLI in place.
 # Idempotent and non-destructive: your .hackathon/ project state is never touched.
 #
-#   curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/9a23e2d84f595acd03e93de6a8a2bf2054f115ae/update.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/215f0def5e1cfbdb51be9f1ee8b0e075db09fdfe/update.sh | bash
 #
 # Environment variables:
 #   HADK_INSTALL_DIR  Where the harness source lives (default: $HOME/.hadk)
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 HADK_INSTALL_DIR="${HADK_INSTALL_DIR:-$HOME/.hadk}"
-HADK_VERSION="${HADK_VERSION:-9a23e2d84f595acd03e93de6a8a2bf2054f115ae}"
+HADK_VERSION="${HADK_VERSION:-215f0def5e1cfbdb51be9f1ee8b0e075db09fdfe}"
 HADK_ALLOW_MOVING_REF="${HADK_ALLOW_MOVING_REF:-0}"
 HADK_SHA256="${HADK_SHA256:-}"
 

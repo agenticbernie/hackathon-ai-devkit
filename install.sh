@@ -2,7 +2,7 @@
 #
 # HADK installer — installs the AI-native Competition Engineering Harness.
 #
-#   curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/9a23e2d84f595acd03e93de6a8a2bf2054f115ae/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/215f0def5e1cfbdb51be9f1ee8b0e075db09fdfe/install.sh | bash
 #
 # Or, safer (inspect first):
 #   curl -fsSL .../install.sh -o install.sh && less install.sh && bash install.sh
@@ -23,7 +23,7 @@ set -euo pipefail
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 HADK_REPO="${HADK_REPO:-https://github.com/agenticbernie/hackathon-ai-devkit.git}"
-HADK_VERSION="${HADK_VERSION:-9a23e2d84f595acd03e93de6a8a2bf2054f115ae}"
+HADK_VERSION="${HADK_VERSION:-215f0def5e1cfbdb51be9f1ee8b0e075db09fdfe}"
 HADK_ALLOW_MOVING_REF="${HADK_ALLOW_MOVING_REF:-0}"
 HADK_SHA256="${HADK_SHA256:-}"
 HADK_INSTALL_DIR="${HADK_INSTALL_DIR:-$HOME/.hadk}"

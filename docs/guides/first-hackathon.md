@@ -10,7 +10,7 @@ submission-ready package using the `hadk` CLI.
 - The harness installed:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/9a23e2d84f595acd03e93de6a8a2bf2054f115ae/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/215f0def5e1cfbdb51be9f1ee8b0e075db09fdfe/install.sh | bash
 ```
 
 Verify with `hadk --version`.
