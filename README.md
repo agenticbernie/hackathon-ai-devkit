@@ -62,7 +62,7 @@ verifies the registry against the files on disk.
 ## 4. One-command installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/e8a191e674cd5e62ec470173b25ba6481e4525da/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/215cc4ea08c6c3a4ecf4fc733865c815b8e9f512/install.sh | bash
 ```
 
 The installer is **idempotent** and **non-destructive**: it detects Node ≥ 20,
