@@ -1,6 +1,6 @@
 # Hackathon Wiki
 
-**Version: 2.1.3**
+**Version: 2.1.4**
 
 Use this workflow when the deliverable is a time-boxed prototype and the judging
 signal is a working demo.
@@ -10,6 +10,12 @@ signal is a working demo.
 > competition state (`state.competition`) now hydrates directly from
 > `user_confirmed` facts, so `hadk status`, validators, and idea handoffs see the
 > same competition name, tracks, judging criteria, and deadline you confirmed.
+
+> **v2.1.4 note**: Imported rich ideas (with `core_mechanism`, `demo_flow`,
+> `wow_moment`, etc.) now produce concrete scopes. `hadk scope` no longer emits
+> generic `Core mechanism`/`Input surface` placeholders for rich ideas; `hadk
+> architecture plan` and `hadk handoff implement` preserve the full
+> VeriTreasury-style specification for the coding agent.
 
 ## Workflow
 

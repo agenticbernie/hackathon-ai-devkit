@@ -2,13 +2,21 @@
 
 ## Baseline
 
-The repository is a pnpm TypeScript monorepo. The baseline on 2026-09-01 (v2.1.3) is:
+The repository is a pnpm TypeScript monorepo. The baseline on 2026-09-01 (v2.1.4) is:
 
 - `pnpm build`: passed
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
 - `pnpm test`: passed, 107 tests (including `tests/competition-propagation.test.ts` regression)
 - `pnpm validate` (registry): passed, 35 skills, 13 schemas
+
+### v2.1.4 delta (2026-09-01)
+
+- **Rich idea → scope**: `hadk scope` now derives MVP contract from imported idea's
+  `core_mechanism`, `solution`, `demo_flow`, `wow_moment`, `build_plan_summary`,
+  `critical_dependencies`, `fallbacks`, `failure_modes` instead of generic placeholders.
+  `hadk architecture plan` now consumes concrete scope; `hadk handoff implement`
+  preserves rich semantics for coding agents. Heuristic ideas remain compatible via fallback.
 
 ### v2.1.3 delta (2026-09-01)
 

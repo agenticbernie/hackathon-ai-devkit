@@ -1,3 +1,27 @@
+# 2.1.4 — 2026-09-01
+
+## Fixed — Rich imported idea semantics preserved through scope → architecture → handoff
+
+- **Root cause**: `hadk scope` ignored the selected imported idea's rich fields
+  (`problem`, `solution`, `core_mechanism`, `demo_flow`, `wow_moment`,
+  `build_plan_summary`, `critical_dependencies`, `fallbacks`, `failure_modes`)
+  and always emitted generic placeholders (`Core mechanism`, `Input surface`,
+  `Output view`, `Demo data & reset`). Architecture then degraded to a generic
+  sentence and handoff lost the VeriTreasury specification.
+- **Fix**: `buildScopeContract` now loads the full `CandidateIdea` from
+  `ideas/candidates.yaml`/`selected.yaml` and, when rich, derives concrete
+  `core_demo_flow`, 4 `mvp_features`, `primary_wow_moment`, `external_dependencies`,
+  and `deferred_features` grounded in the idea. Heuristic ideas fall back to generic
+  placeholders for backward compatibility. `buildArchitecturePlan` now builds
+  `system_context`, `component_boundaries`, `data_flow`, and `decisions` from the
+  concrete scope. `AgentBridge` now embeds rich idea semantics in
+  `handoff/context-pack.md` and per-feature task packets.
+- **Verification**: Added `tests/rich-scope.test.ts` (4 tests) with a rich
+  VeriTreasury fixture and a heuristic fixture: asserts scope contains attestation
+  semantics (no generic placeholders), architecture mentions VeriTreasury, handoff
+  contains problem/solution/demo_flow/fallbacks, and heuristic still produces valid scope.
+- **Build/tests**: `pnpm build` + `pnpm test` 111/111 pass.
+
 # 2.1.3 — 2026-09-01
 
 ## Fixed — Installer pinning to version tag

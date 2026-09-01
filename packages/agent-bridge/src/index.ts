@@ -36,12 +36,14 @@ export class AgentBridge {
     if (!architecture.ok) return err(hadkError('ARCHITECTURE_MISSING', 'Architecture plan is required before handoff.'));
     const scopeVersion = String(this.store.readArtifact<any>('scope', 'scope.yaml').ok ? (this.store.readArtifact<any>('scope', 'scope.yaml') as any).value?.version ?? '2.1' : '2.1');
     const architectureVersion = String(architecture.value.version ?? '2.1');
-    const context = this.buildContextPack(state, architecture.value, scopeVersion, architectureVersion);
+    // Load rich selected idea for context preservation (fallback to null for heuristic compatibility)
+    const candidate = this.loadSelectedCandidate();
+    const context = this.buildContextPack(state, architecture.value, scopeVersion, architectureVersion, candidate);
     const contextPath = this.store.writeTextArtifact('generated', 'handoff/context-pack.md', context);
     if (!contextPath.ok) return contextPath;
     const packetPaths: string[] = [];
     for (const feature of state.scope.mvp_features) {
-      const packet = this.packetFor(feature, state, scopeVersion, architectureVersion);
+      const packet = this.packetFor(feature, state, scopeVersion, architectureVersion, candidate);
       const written = this.store.writeArtifact('generated', `handoff/tasks/${packet.task_id}.yaml`, packet);
       if (!written.ok) return written;
       packetPaths.push(written.value);
@@ -127,15 +129,70 @@ export class AgentBridge {
     return ok({ result: { ...result, evidence_refs: [evidence.value.id] }, evidence_ref: evidence.value.id });
   }
 
-  private packetFor(feature: CompetitionState['scope']['mvp_features'][number], state: CompetitionState, scopeVersion: string, architectureVersion: string): AgentTaskPacket {
+  private loadSelectedCandidate(): any | null {
+    try {
+      const selectedArt = this.store.readArtifact<any>('ideas', 'selected.yaml');
+      const candidatesArt = this.store.readArtifact<any>('ideas', 'candidates.yaml');
+      const candidates: any[] = candidatesArt.ok ? (candidatesArt.value?.candidates ?? []) : [];
+      let candidate: any | null = null;
+      if (selectedArt.ok) {
+        const sel = selectedArt.value?.selected_idea ?? selectedArt.value?.selected ?? selectedArt.value;
+        const selId = sel?.id ?? selectedArt.value?.selected_idea?.id;
+        if (selId && candidates.length) {
+          candidate = candidates.find((c) => c.id === selId) ?? null;
+        }
+        // If selected.yaml directly contains rich fields (imported idea), use it
+        if (!candidate && sel && sel.core_mechanism && sel.demo_flow) {
+          candidate = sel;
+        }
+        // Fallback by name
+        if (!candidate && sel?.name && candidates.length) {
+          candidate = candidates.find((c) => c.name === sel.name) ?? null;
+        }
+        if (!candidate && sel?.name) {
+          // No candidates file, but selected itself is the candidate (e.g., after import, candidates.yaml may have it)
+          // Try to treat sel as candidate if it has rich fields
+          if (sel.core_mechanism) candidate = sel;
+        }
+      }
+      // Last resort: match by state selected name
+      if (!candidate && candidates.length) {
+        const loaded = this.store.load();
+        const name = loaded.ok ? loaded.value.strategy.selected_idea : null;
+        if (name) candidate = candidates.find((c) => c.name === name) ?? null;
+      }
+      return candidate;
+    } catch {
+      return null;
+    }
+  }
+
+  private packetFor(feature: CompetitionState['scope']['mvp_features'][number], state: CompetitionState, scopeVersion: string, architectureVersion: string, candidate?: any | null): AgentTaskPacket {
     const featureId = feature.id;
+    // Enrich objective and acceptance with idea semantics when available
+    const ideaCtx = candidate ? ` for "${candidate.name}" — ${candidate.core_mechanism?.slice(0, 80) ?? feature.name}` : '';
+    const objective = candidate
+      ? `${feature.name}${ideaCtx}: ${(feature as any).purpose ?? feature.name} (why: ${(feature as any).why_it_exists ?? 'core demo proof'})`
+      : feature.name;
+    // Use feature's own acceptance_criteria when present (rich scope), otherwise generic
+    const baseCriteria = (feature as any).acceptance_criteria?.length
+      ? (feature as any).acceptance_criteria
+      : [`Implement ${feature.name}`, `Meet demo requirement: ${feature.required_for_demo ? 'yes' : 'no'}`, `Meet rubric requirement: ${feature.required_for_rubric ? 'yes' : 'no'}`];
+    // Add idea-specific criteria when rich
+    const extraCriteria: string[] = [];
+    if (candidate) {
+      if (candidate.solution) extraCriteria.push(`Implements solution: ${candidate.solution.slice(0, 100)}`);
+      if (candidate.core_mechanism) extraCriteria.push(`Core mechanism: ${candidate.core_mechanism.slice(0, 100)}`);
+      if (candidate.build_plan_summary) extraCriteria.push(`Build plan: ${candidate.build_plan_summary.slice(0, 100)}`);
+    }
+    const acceptance_criteria = [...baseCriteria, ...extraCriteria].slice(0, 6);
     return {
       schema_version: '2.1',
       created_at: nowIso(),
       updated_at: nowIso(),
       created_by: 'hadk',
-      source_refs: ['state.yaml', 'architecture/plan.yaml'],
-      assumptions: [],
+      source_refs: ['state.yaml', 'architecture/plan.yaml', 'ideas/selected.yaml', 'scope/scope.yaml'],
+      assumptions: candidate ? [`Implements idea "${candidate.name}" (${candidate.id}) — ${candidate.one_liner ?? candidate.solution?.slice(0, 80) ?? ''}`, `Fallback: ${candidate.fallbacks?.[0] ?? feature.fallback ?? 'none'}`] : [],
       blockers: [],
       evidence_refs: [],
       verification_status: 'planned',
@@ -143,19 +200,58 @@ export class AgentBridge {
       feature_id: featureId,
       scope_version: scopeVersion,
       architecture_version: architectureVersion,
-      objective: feature.name,
+      objective,
       allowed_files: [`src/**/${featureId}/**`, `src/**/${featureId.replaceAll('_', '-')}/**`, `tests/${featureId}.test.ts`],
       forbidden_files: ['.env', '.env.local', 'credentials/**', '.hackathon/**'],
-      acceptance_criteria: [`Implement ${feature.name}`, `Meet demo requirement: ${feature.required_for_demo ? 'yes' : 'no'}`, `Meet rubric requirement: ${feature.required_for_rubric ? 'yes' : 'no'}`],
+      acceptance_criteria,
       required_tests: [`tests/${featureId}.test.ts`],
       verification_commands: [['pnpm', 'run', 'typecheck'], ['pnpm', 'run', 'test'], ['pnpm', 'run', 'build']],
       dependencies: feature.dependencies,
-      fallback: feature.fallback ?? 'Reduce to the documented core demo path.',
+      fallback: (feature as any).fallback ?? candidate?.fallbacks?.[0] ?? 'Reduce to the documented core demo path.',
       expected_result_schema: 'schemas/v2.1/agent-result.schema.json',
     };
   }
 
-  private buildContextPack(state: CompetitionState, architecture: any, scopeVersion: string, architectureVersion: string): string {
+  private buildContextPack(state: CompetitionState, architecture: any, scopeVersion: string, architectureVersion: string, candidate?: any | null): string {
+    const ideaSection = candidate
+      ? [
+          '## Selected idea (rich semantics preserved)',
+          `- Name: ${candidate.name} (${candidate.id})`,
+          `- One-liner: ${candidate.one_liner ?? ''}`,
+          `- Target user: ${candidate.target_user ?? ''}`,
+          `- Problem: ${candidate.problem ?? ''}`,
+          `- Solution: ${candidate.solution ?? ''}`,
+          `- Core mechanism: ${candidate.core_mechanism ?? ''}`,
+          `- Demo flow: ${(candidate.demo_flow ?? []).map((s: string, i: number) => `${i + 1}. ${s}`).join(' | ')}`,
+          `- Wow moment: ${candidate.wow_moment ?? ''}`,
+          `- Build plan: ${candidate.build_plan_summary ?? ''}`,
+          `- Critical dependencies: ${(candidate.critical_dependencies ?? []).join(', ')}`,
+          `- Fallbacks: ${(candidate.fallbacks ?? []).join(' | ')}`,
+          `- Failure modes: ${(candidate.failure_modes ?? []).join(' | ')}`,
+          `- Estimated hours: ${candidate.estimated_hours ?? 'n/a'}`,
+          '',
+        ]
+      : [`## Selected idea: ${state.strategy.selected_idea ?? 'none'}`, ''];
+    const scopeSection = [
+      '## Locked scope (concrete, derived from idea)',
+      ...state.scope.mvp_features.map((feature) => {
+        const f: any = feature;
+        return `- ${feature.id}: ${feature.name} — ${f.purpose ?? ''} (why: ${f.why_it_exists ?? ''}) | AC: ${(f.acceptance_criteria ?? []).join(' | ')} | fallback: ${f.fallback ?? ''} | deps: ${(f.dependencies ?? []).join(', ')}`;
+      }),
+      '',
+      '### Demo flow (from idea when rich)',
+      ...state.scope.demo_flow.map((step) => `- ${step.step}. ${step.user_action} → ${step.system_response} (proof: ${step.proof_shown})`),
+      '',
+      `### Wow moment: ${state.scope.primary_wow_moment?.description ?? 'none'} (step ${state.scope.primary_wow_moment?.demo_step ?? 1})`,
+      `Judge takeaway: ${state.scope.primary_wow_moment?.judge_takeaway ?? ''}`,
+      '',
+      '### External dependencies',
+      ...state.scope.external_dependencies.map((d) => `- ${d.name} (${d.type}): ${d.risk} — fallback: ${d.fallback ?? 'none'}`),
+      '',
+      '### Deferred (cut boundaries)',
+      ...state.scope.deferred_features.map((d) => `- ${d.id}: ${d.name} — ${d.reason_deferred}`),
+      '',
+    ];
     return [
       '# HADK v2.1 Agent-Compatible Handoff',
       '',
@@ -165,11 +261,13 @@ export class AgentBridge {
       `Scope version: ${scopeVersion}`,
       `Architecture version: ${architectureVersion}`,
       '',
-      '## Locked scope',
-      ...state.scope.mvp_features.map((feature) => `- ${feature.id}: ${feature.name}`),
-      '',
+      ...ideaSection,
+      ...scopeSection,
       '## Architecture',
       architecture.system_context ?? 'No system context supplied.',
+      `Components: ${(architecture.component_boundaries ?? []).map((c: any) => `${c.name} (${c.responsibility})`).join(' | ')}`,
+      `Data flow: ${(architecture.data_flow ?? []).join(' → ')}`,
+      `Decisions: ${(architecture.decisions ?? []).map((d: any) => `${d.title}: ${d.decision}`).join(' | ')}`,
       '',
       '## Verification commands',
       '- pnpm run typecheck',

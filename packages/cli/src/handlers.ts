@@ -11,6 +11,8 @@ import {
   type CompetitionState,
   type CandidateIdea,
   type SelectedIdea,
+  type DemoFlowStep,
+  type ScopeFeatureContract,
   SCORING_WEIGHTS,
   STRATEGY_MODES,
   TASTE_OPTIONS,
@@ -722,7 +724,31 @@ export async function cmdScope(store: StateStore, opts: { unlock?: boolean }): P
   const ideaName = state.strategy.selected_idea;
 
   const available = remainingHours(state.competition.deadline, state.competition.remaining_hours) ?? 48;
-  const scope = buildScopeContract(state, ideaName, available);
+  // Load the full selected candidate to derive rich scope (fallback to generic for heuristic ideas)
+  let selectedCandidate: CandidateIdea | null = null;
+  try {
+    const selectedArt = store.readArtifact<any>('ideas', 'selected.yaml');
+    const candidatesArt = store.readArtifact<any>('ideas', 'candidates.yaml');
+    const selectedId = selectedArt.ok ? (selectedArt.value?.selected_idea?.id ?? selectedArt.value?.selected?.id) : null;
+    const candidates: CandidateIdea[] = candidatesArt.ok ? (candidatesArt.value?.candidates ?? []) : [];
+    if (selectedId && candidates.length) {
+      selectedCandidate = candidates.find((c) => c.id === selectedId) ?? null;
+      // Also check if selected.yaml directly contains the full candidate (imported rich idea)
+      if (!selectedCandidate && selectedArt.ok) {
+        const sel = selectedArt.value?.selected ?? selectedArt.value?.selected_idea;
+        if (sel && sel.core_mechanism && sel.demo_flow) {
+          selectedCandidate = sel as CandidateIdea;
+        }
+      }
+    }
+    // Fallback: try to find candidate by name if id not matched
+    if (!selectedCandidate && candidates.length) {
+      selectedCandidate = candidates.find((c) => c.name === ideaName) ?? null;
+    }
+  } catch {
+    // ignore and fallback to generic
+  }
+  const scope = buildScopeContract(state, ideaName, available, selectedCandidate);
 
   store.writeArtifact('scope', 'scope.yaml', scope);
 
@@ -1716,8 +1742,175 @@ function generateCandidateIdeas(state: CompetitionState, count: number): Candida
   return ideas;
 }
 
-function buildScopeContract(state: CompetitionState, ideaName: string, availableHours: number) {
+function buildScopeContract(state: CompetitionState, ideaName: string, availableHours: number, candidate?: CandidateIdea | null) {
   const hoursPer = Math.max(0.1, Math.floor((availableHours / 4.5) * 10) / 10);
+  // If a rich candidate is available, derive concrete scope from its semantics.
+  // Otherwise fall back to generic placeholders for backward compatibility.
+  const isRich = !!candidate && typeof candidate.core_mechanism === 'string' && candidate.core_mechanism.trim().length > 10 && Array.isArray(candidate.demo_flow) && candidate.demo_flow.length > 0;
+  if (isRich && candidate) {
+    const idea = candidate;
+    // Helper to slugify for ids
+    const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30) || 'feature';
+    const coreId = slug(idea.core_mechanism).slice(0, 20) || 'core_mechanism';
+    // Build core_demo_flow from idea.demo_flow
+    const core_demo_flow: DemoFlowStep[] = idea.demo_flow.map((step, idx) => {
+      // Try to split "User does X -> System does Y" or use the whole string as user_action
+      const parts = step.split(/→|->|:/);
+      const user_action = parts[0]?.trim() || step.trim();
+      const system_response = parts[1]?.trim() || `System executes ${idea.core_mechanism.slice(0, 60)}`;
+      const proof_shown = idx === idea.demo_flow.length - 1 ? idea.wow_moment.slice(0, 120) : `Step ${idx + 1} completes: ${idea.solution.slice(0, 80)}`;
+      return { step: idx + 1, user_action, system_response, proof_shown };
+    });
+    // Ensure at least 2 steps
+    while (core_demo_flow.length < 2) {
+      core_demo_flow.push({ step: core_demo_flow.length + 1, user_action: `Continue ${idea.core_mechanism.slice(0, 40)}`, system_response: 'System processes', proof_shown: idea.wow_moment.slice(0, 80) });
+    }
+    const wowStep = Math.min(2, core_demo_flow.length);
+    // Build MVP features grounded in idea semantics
+    const mvp_features: ScopeFeatureContract[] = [];
+    // Feature 1: Core mechanism
+    mvp_features.push({
+      id: coreId,
+      name: idea.core_mechanism.slice(0, 60),
+      purpose: idea.solution.slice(0, 120),
+      why_it_exists: `Implements ${idea.core_mechanism.slice(0, 80)} to solve: ${idea.problem.slice(0, 80)}`,
+      acceptance_criteria: [
+        `${idea.core_mechanism.slice(0, 80)} executes and produces verifiable output for seeded demo input`,
+        `Failure mode handled: ${idea.failure_modes[0] ?? 'graceful fallback'}`,
+        `Demo flow step ${wowStep} shows ${idea.wow_moment.slice(0, 80)}`,
+      ],
+      owner: 'team',
+      demo_step: wowStep,
+      verification_method: 'automated demo journey + unit test for core_mechanism',
+      required_for_demo: true,
+      required_for_rubric: true,
+      estimated_hours: Math.max(2, idea.estimated_hours ? Math.round(idea.estimated_hours * 0.5) : hoursPer * 2),
+      dependencies: idea.critical_dependencies.slice(0, 2),
+      fallback: idea.fallbacks[0] ?? 'Deterministic mock of core_mechanism',
+    });
+    // Feature 2: Derived from first demo_flow step or build_plan
+    const secondName = idea.demo_flow[0]?.slice(0, 50) || idea.build_plan_summary.split(/[,.]/)[0]?.slice(0, 50) || 'Input & Attestation Surface';
+    const secondId = slug(secondName) || 'input_surface';
+    mvp_features.push({
+      id: secondId,
+      name: secondName,
+      purpose: `Enable ${idea.target_user} to trigger ${idea.core_mechanism.slice(0, 40)}`,
+      why_it_exists: `Judges must see the path from ${idea.problem.slice(0, 60)} to verified result`,
+      acceptance_criteria: [
+        `User can submit ${idea.target_user} input via seeded or live path`,
+        `Input is validated and routed to ${coreId}`,
+      ],
+      owner: 'team',
+      demo_step: 1,
+      verification_method: 'API smoke + browser input test',
+      required_for_demo: true,
+      required_for_rubric: false,
+      estimated_hours: hoursPer,
+      dependencies: [],
+      fallback: idea.fallbacks[1] ?? 'Hardcoded demo input with seeded attestation',
+    });
+    // Feature 3: Output / verification view
+    const thirdName = idea.demo_flow[idea.demo_flow.length - 1]?.slice(0, 50) || 'Verified Output View';
+    const thirdId = slug(thirdName) || 'output_view';
+    const thirdUniqueId = thirdId === secondId || thirdId === coreId ? `${thirdId}_output` : thirdId;
+    mvp_features.push({
+      id: thirdUniqueId,
+      name: thirdName,
+      purpose: `Render ${idea.wow_moment.slice(0, 80)} for judges`,
+      why_it_exists: idea.rubric_fit.slice(0, 100),
+      acceptance_criteria: [
+        `Output displays ${idea.wow_moment.slice(0, 80)} without error`,
+        `Proof is verifiable via ${idea.core_mechanism.slice(0, 50)}`,
+      ],
+      owner: 'team',
+      demo_step: core_demo_flow.length,
+      verification_method: 'browser assertion + snapshot test',
+      required_for_demo: true,
+      required_for_rubric: true,
+      estimated_hours: hoursPer,
+      dependencies: [coreId],
+      fallback: 'Static screenshot of verified output',
+    });
+    // Feature 4: Demo data & reset with idea-specific seeding
+    mvp_features.push({
+      id: 'demo_data',
+      name: 'Demo data & reset',
+      purpose: `Deterministic seeding for ${idea.name} demo`,
+      why_it_exists: `Rehearsals must start from known ${idea.core_mechanism.slice(0, 40)} state`,
+      acceptance_criteria: [
+        'pnpm demo:reset clears prior attestations',
+        'pnpm demo:seed creates verifiable demo treasury/proof',
+        'Seeded data triggers wow moment deterministically',
+      ],
+      owner: 'team',
+      demo_step: 1,
+      verification_method: 'reset/seed command + idempotency test',
+      required_for_demo: true,
+      required_for_rubric: false,
+      estimated_hours: Math.max(0.5, Math.floor((hoursPer / 2) * 10) / 10),
+      dependencies: [],
+      fallback: 'Seed script with canned attestation',
+    });
+    // External dependencies from critical_dependencies
+    const external_dependencies = idea.critical_dependencies.map((dep, idx) => ({
+      name: dep.slice(0, 60),
+      type: dep.toLowerCase().includes('sdk') || dep.toLowerCase().includes('api') ? 'api' : dep.toLowerCase().includes('rpc') || dep.toLowerCase().includes('chain') ? 'rpc' : 'api',
+      risk: idea.failure_modes[idx % idea.failure_modes.length]?.slice(0, 100) ?? 'Latency or unavailable during demo',
+      fallback: idea.fallbacks[idx % idea.fallbacks.length] ?? 'Deterministic mock',
+    }));
+    if (external_dependencies.length === 0) {
+      external_dependencies.push({ name: 'AI provider API', type: 'api', risk: 'Latency or key failure during demo', fallback: 'DEMO_FALLBACK_MODE=true canned responses' });
+    }
+    // Deferred features with cut boundaries grounded in build_plan
+    const deferred_features = [
+      { id: 'advanced_analytics', name: 'Advanced analytics', reason_deferred: `Not required to prove ${idea.core_mechanism.slice(0, 50)}; cut to protect ${availableHours}h budget` },
+      { id: 'multi_chain_support', name: 'Multi-chain expansion', reason_deferred: `Defer beyond demo: ${idea.failure_modes[0]?.slice(0, 60) ?? 'extra chains increase demo risk'}` },
+    ];
+    // Add risks from failure_modes
+    const risks = idea.failure_modes.slice(0, 2).map((mode, idx) => `${mode} (mitigated by ${idea.fallbacks[idx % idea.fallbacks.length]?.slice(0, 50) ?? 'fallback'})`);
+
+    return {
+      schema_version: '2.1',
+      created_at: nowIso(),
+      updated_at: nowIso(),
+      created_by: 'hadk',
+      source_refs: ['ideas/selected.yaml', 'ideas/candidates.yaml'],
+      assumptions: [`Scope derived from selected idea "${idea.name}" (${idea.id})`, `Team confirms ${idea.estimated_hours}h estimate and ${idea.critical_dependencies.length} critical dependencies`],
+      blockers: [],
+      evidence_refs: [],
+      verification_status: 'unverified',
+      version: `2.1-${Date.now().toString(36)}`,
+      project: { name: ideaName, type: state.competition.type },
+      scope: {
+        status: 'locked',
+        core_demo_flow,
+        mvp_features,
+        deferred_features,
+        primary_wow_moment: {
+          description: idea.wow_moment,
+          demo_step: wowStep,
+          judge_takeaway: idea.wow_moment.slice(0, 120),
+        },
+        external_dependencies,
+        implementation_budget: hoursPer * 4,
+        integration_budget: 3,
+        verification_budget: 2,
+        demo_rehearsal_budget: 2,
+        buffer: Math.max(2, Math.floor(availableHours * 0.1)),
+        risk_budget: Math.max(1, Math.floor(availableHours * 0.05)),
+        reset_seed_strategy: `Run pnpm demo:reset then pnpm demo:seed before each rehearsal. Seeded data must trigger: ${idea.wow_moment.slice(0, 80)}`,
+        time_budget: {
+          implementation_hours: hoursPer * 4,
+          integration_hours: 3,
+          validation_hours: 2,
+          demo_hours: 2,
+          submission_hours: 2,
+          buffer_hours: Math.max(2, Math.floor(availableHours * 0.1)),
+        },
+      },
+    };
+  }
+  // Fallback: generic heuristic for backward compatibility
   return {
     schema_version: '2.1',
     created_at: nowIso(),

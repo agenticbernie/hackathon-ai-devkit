@@ -1,6 +1,6 @@
 # HADK Wiki
 
-**Version: 2.1.3**
+**Version: 2.1.4**
 
 HADK is an AI-native competition engineering harness. It turns a competition
 brief or startup thesis into structured artifacts, a scoped build, a reliable
@@ -13,6 +13,10 @@ demo, and a submission package.
 >
 > **v2.1.2** additionally normalizes deadlines like `September 13, 2026, 23:59:00 ET (Extended)`
 > to ISO so `Time remaining` computes correctly for the CTC brief.
+>
+> **v2.1.4** fixes rich imported idea semantics being discarded by `hadk scope`:
+> scope, architecture, and handoff now derive from `core_mechanism`, `solution`,
+> `demo_flow`, `wow_moment`, etc., with heuristic fallback preserved.
 
 Choose a workflow:
 
