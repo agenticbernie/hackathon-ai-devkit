@@ -287,12 +287,26 @@ function normalize(value: string): string {
   return value.replaceAll('\\', '/').replace(/^\.\/+/, '');
 }
 
-function matchesPattern(pattern: string, value: string): boolean {
+export function matchesPattern(pattern: string, value: string): boolean {
   if (pattern === value) return true;
-  const escaped = pattern
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replaceAll('**/', '(?:.*/)?')
-    .replaceAll('**', '.*')
-    .replaceAll('*', '[^/]*');
-  return new RegExp(`^${escaped}$`).test(value);
+  // Use placeholders to avoid sequential replacement corrupting generated regex fragments.
+  // e.g. '**/' -> '(?:.*/)?' contains '*' which must not be re-replaced.
+  const GLOBSTAR_SLASH = '__GLOBSTAR_SLASH__';
+  const GLOBSTAR = '__GLOBSTAR__';
+  const STAR = '__STAR__';
+  const QMARK = '__QMARK__';
+  let tmp = pattern
+    .replaceAll('**/', GLOBSTAR_SLASH)
+    .replaceAll('**', GLOBSTAR)
+    .replaceAll('*', STAR)
+    .replaceAll('?', QMARK);
+  // Escape regex special chars (placeholders contain only A-Z and _ so are safe)
+  tmp = tmp.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  // Restore placeholders to regex fragments
+  tmp = tmp
+    .replaceAll(GLOBSTAR_SLASH, '(?:.*/)?')
+    .replaceAll(GLOBSTAR, '.*')
+    .replaceAll(STAR, '[^/]*')
+    .replaceAll(QMARK, '[^/]');
+  return new RegExp(`^${tmp}$`).test(value);
 }

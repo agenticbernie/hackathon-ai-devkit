@@ -1,3 +1,17 @@
+# 2.1.5 — 2026-09-01
+
+## Fixed — Agent-bridge glob-to-regex corruption for `src/**/attestcoin-batch-pro/**`
+
+- **Root cause**: `matchesPattern()` in `packages/agent-bridge/src/index.ts:290` did
+  sequential `replaceAll('**/', '(?:.*/)?')` → `replaceAll('*', '[^/]*')`, so the
+  `*` inside the generated fragment `(?:.*/)?` was re-replaced to `(?:.[^/]*/)?`,
+  breaking deep matches like `src/app/api/attestcoin-batch-pro/route.ts` (false).
+- **Fix**: Placeholder-based glob→regex ( `**/`→`__GLOBSTAR_SLASH__`, `**`→`__GLOBSTAR__`,
+  `*`→`__STAR__`, `?`→`__QMARK__` → escape → restore to `(?:.*/)?`/`.*`/`[^/]*`/`[^/]`).
+  Exported `matchesPattern` for testing. Added `tests/agent-bridge-glob.test.ts` (8 tests):
+  deep `src/**/attestcoin-batch-pro/**` matches, unrelated non-matches, exact
+  `tests/*.test.ts`, forbidden `credentials/**`/`.hackathon/**`/`.env` boundaries.
+
 # 2.1.4 — 2026-09-01
 
 ## Fixed — Rich imported idea semantics preserved through scope → architecture → handoff

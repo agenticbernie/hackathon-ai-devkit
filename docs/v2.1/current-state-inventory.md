@@ -2,13 +2,20 @@
 
 ## Baseline
 
-The repository is a pnpm TypeScript monorepo. The baseline on 2026-09-01 (v2.1.4) is:
+The repository is a pnpm TypeScript monorepo. The baseline on 2026-09-01 (v2.1.5) is:
 
 - `pnpm build`: passed
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
-- `pnpm test`: passed, 107 tests (including `tests/competition-propagation.test.ts` regression)
+- `pnpm test`: passed, 119 tests (including `tests/competition-propagation.test.ts` + `tests/rich-scope.test.ts` + `tests/agent-bridge-glob.test.ts`)
 - `pnpm validate` (registry): passed, 35 skills, 13 schemas
+
+### v2.1.5 delta (2026-09-01)
+
+- **Agent-bridge glob**: `matchesPattern()` now uses placeholder-based glob-to-regex to avoid
+  sequential `*` replacement corrupting `**/` fragments (`src/**/attestcoin-batch-pro/**`
+  now correctly matches `src/app/api/attestcoin-batch-pro/route.ts`). Added
+  `tests/agent-bridge-glob.test.ts` (8 tests).
 
 ### v2.1.4 delta (2026-09-01)
 

@@ -1,6 +1,6 @@
 # HADK Wiki
 
-**Version: 2.1.4**
+**Version: 2.1.5**
 
 HADK is an AI-native competition engineering harness. It turns a competition
 brief or startup thesis into structured artifacts, a scoped build, a reliable
@@ -17,6 +17,9 @@ demo, and a submission package.
 > **v2.1.4** fixes rich imported idea semantics being discarded by `hadk scope`:
 > scope, architecture, and handoff now derive from `core_mechanism`, `solution`,
 > `demo_flow`, `wow_moment`, etc., with heuristic fallback preserved.
+>
+> **v2.1.5** fixes `matchesPattern()` glob corruption (`src/**/attestcoin-batch-pro/**`
+> now correctly matches deep paths; forbidden boundaries not weakened).
 
 Choose a workflow:
 

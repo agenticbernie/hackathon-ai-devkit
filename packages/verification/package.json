@@ -1,6 +1,6 @@
 {
   "name": "@hadk/verification",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "description": "Evidence-backed project, build, and demo verification",
   "type": "module",
   "main": "dist/index.js",
