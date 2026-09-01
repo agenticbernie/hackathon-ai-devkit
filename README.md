@@ -1,6 +1,6 @@
 # Hackathon AI DevKit (HADK)
 
-**Version: 2.1.5**
+**Version: 2.1.6**
 
 > **Competition Delivery Control Plane for teams and coding agents.**
 
@@ -62,7 +62,7 @@ verifies the registry against the files on disk.
 ## 4. One-command installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/v2.1.5/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/v2.1.6/install.sh | bash
 ```
 
 The installer is **idempotent** and **non-destructive**: it detects Node ≥ 20,

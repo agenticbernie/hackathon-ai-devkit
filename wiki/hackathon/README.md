@@ -1,6 +1,6 @@
 # Hackathon Wiki
 
-**Version: 2.1.5**
+**Version: 2.1.6**
 
 Use this workflow when the deliverable is a time-boxed prototype and the judging
 signal is a working demo.

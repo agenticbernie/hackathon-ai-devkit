@@ -1,3 +1,33 @@
+# 2.1.6 — 2026-09-01
+
+## Fixed — Handoff orchestration / state synchronization (fail-closed)
+
+- **Root cause**: `handoff implement` generated 4 `generated/handoff/tasks/*.yaml` but never
+  populated `state.delivery.tasks` (`tasks: []`); `handoff import` only wrote
+  `build/agent-result-*.yaml` and did not update the canonical task or invalidate
+  `build_gate`. `Orchestrator` and `validators` ignored `tasks`, so `hadk next`
+  incorrectly returned `hadk verify demo` and `phase` advanced to `demo` with 3
+  tasks pending. Repeated `handoff implement` created new random `task_id`s and
+  accumulated stale/duplicate packets; stale `build_gate=passed` remained passed
+  after new code was imported.
+- **Fix**: `AgentBridge.implement` now uses deterministic `task-{feature}-{scopeVersion}`
+  ids, cleans stale `generated/handoff/tasks/*.yaml` before write, and atomically
+  populates `state.delivery.tasks` (preserving `done` for same `scopeVersion` on
+  re-run, resetting on new scope). `AgentBridge.importResult` now updates the
+  canonical task to `done`/`blocked`/`in_progress`, reconstructs tasks if `tasks: []`,
+  invalidates `build_gate` (fail-closed) and forces `phase=build` while tasks are
+  pending. `Orchestrator.checkGate` (`build`/`demo`) and `currentPhaseAction`
+  (`build`) now block on `tasks` and stale `build_gate`; `validateBuild`/`validateDemo`
+  and `cmdVerifyBuild`/`cmdVerifyDemo` (human bypass preserved) enforce the same
+  invariants. `cmdScope`/`cmdArchitecturePlan`/`replan` now clear/invalidate tasks
+  and gates on scope/arch change.
+- **Verification**: Added `tests/handoff-orchestration.test.ts` (5 tests) for 4-task
+  generation, duplicate-free re-run, single-import partial completion with correct
+  `hadk next` (`build`), build-gate invalidation, stale packet rejection on new
+  `scopeVersion`, and full `build`→`demo` transition only when all tasks `done` and
+  `build_gate` passed. `tests/agent-bridge-glob.test.ts` (8) and `tests/rich-scope.test.ts`
+  (4) still pass. `pnpm build` + `pnpm test` 124/124.
+
 # 2.1.5 — 2026-09-01
 
 ## Fixed — Agent-bridge glob-to-regex corruption for `src/**/attestcoin-batch-pro/**`

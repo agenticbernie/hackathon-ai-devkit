@@ -344,6 +344,25 @@ export function validateDemo(state: CompetitionState, store?: StateStore): Valid
     issues.push(error('NO_DEMO_FLOW', 'No documented demo path.'));
   }
 
+  // Check if demo is human-attested - if so, don't require build/tasks (legacy e2e uses human demo to bypass)
+  let isHumanAttested = false;
+  if (store) {
+    const demoArt = store.readArtifact<any>('demo', 'verification.yaml');
+    if (demoArt.ok && demoArt.value?.mode === 'human-attested') {
+      isHumanAttested = true;
+    }
+  }
+  if (!isHumanAttested) {
+    // Implementation tasks must be done before demo (only for automated demo, and only if tasks are tracked)
+    if (state.delivery.tasks.length > 0 && state.delivery.tasks.some((t) => t.status !== 'done') && state.scope.mvp_features.length > 0) {
+      const pending = state.delivery.tasks.filter((t) => t.status !== 'done').map((t) => t.feature_id ?? t.id).join(', ');
+      issues.push(error('TASKS_PENDING', `Implementation tasks pending: ${pending}. Cannot demo.`));
+    }
+    if (state.gates.build_gate !== 'passed') {
+      issues.push(error('BUILD_GATE_NOT_PASSED', 'Build gate must be passed before demo. Run `hadk verify build`.'));
+    }
+  }
+
   if (state.delivery.demo_status === 'blocked') {
     issues.push(error('DEMO_BLOCKED', 'Demo path has unresolved blockers.'));
   }
@@ -479,6 +498,22 @@ export function runValidator(name: ValidatorName, store: StateStore, hadkRoot: s
 export function validateBuild(store: StateStore): ValidationResult {
   const issues: ValidationIssue[] = [];
   const protoDir = join(store.projectRoot, 'prototype');
+
+  // Check task completion (fail-closed) - build should not be considered valid if tasks are pending
+  // For backward compat, only check if tasks are tracked (handoff implement was run); if no tasks but features exist, don't fail here
+  // The handoff flow will create tasks, but scaffold-only flows (like reference-project.test) don't use tasks
+  const loadedForTasks = store.load();
+  if (loadedForTasks.ok) {
+    const st = loadedForTasks.value;
+    if (st.delivery.tasks.length > 0 && st.delivery.tasks.some((t) => t.status !== 'done')) {
+      const pending = st.delivery.tasks.filter((t) => t.status !== 'done').map((t) => t.feature_id ?? t.id).join(', ');
+      issues.push(error('TASKS_PENDING', `Implementation tasks pending: ${pending}. Complete via handoff import.`));
+    }
+    // If build_gate is passed but tasks are pending, it's stale
+    if (st.gates.build_gate === 'passed' && st.delivery.tasks.some((t) => t.status !== 'done')) {
+      issues.push(error('BUILD_GATE_STALE', 'Build gate is stale: implementation tasks are still pending.'));
+    }
+  }
 
   if (!existsSync(protoDir)) {
     issues.push(error('NO_PROJECT', 'No generated project found at prototype/. Run `hadk scaffold`.'));

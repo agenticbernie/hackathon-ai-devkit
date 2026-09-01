@@ -14,7 +14,7 @@ import {
   stringifyYaml,
 } from '@hadk/core';
 import { StateStore } from '@hadk/state-store';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, unlinkSync, rmSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 export interface HandoffResult {
@@ -34,20 +34,126 @@ export class AgentBridge {
     if (state.scope.status !== 'locked') return err(hadkError('SCOPE_NOT_LOCKED', 'Lock scope before creating agent task packets.'));
     const architecture = this.store.readArtifact<any>('architecture', 'plan.yaml');
     if (!architecture.ok) return err(hadkError('ARCHITECTURE_MISSING', 'Architecture plan is required before handoff.'));
-    const scopeVersion = String(this.store.readArtifact<any>('scope', 'scope.yaml').ok ? (this.store.readArtifact<any>('scope', 'scope.yaml') as any).value?.version ?? '2.1' : '2.1');
+    const scopeArtifact = this.store.readArtifact<any>('scope', 'scope.yaml');
+    const scopeVersion = String(scopeArtifact.ok ? (scopeArtifact.value?.version ?? '2.1') : '2.1');
     const architectureVersion = String(architecture.value.version ?? '2.1');
     // Load rich selected idea for context preservation (fallback to null for heuristic compatibility)
     const candidate = this.loadSelectedCandidate();
     const context = this.buildContextPack(state, architecture.value, scopeVersion, architectureVersion, candidate);
     const contextPath = this.store.writeTextArtifact('generated', 'handoff/context-pack.md', context);
     if (!contextPath.ok) return contextPath;
+
+    // Clean up stale handoff task packets from previous generations to avoid duplicates
+    // Do this before generating new packets, but preserve the new generation's files
+    const handoffTasksDir = join(this.store.artifactsDir, 'generated', 'handoff', 'tasks');
+    const existingPackets: string[] = [];
+    try {
+      if (existsSync(handoffTasksDir)) {
+        for (const file of readdirSync(handoffTasksDir)) {
+          if (file.endsWith('.yaml') || file.endsWith('.yml')) {
+            existingPackets.push(join(handoffTasksDir, file));
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     const packetPaths: string[] = [];
+    const newTaskIds = new Set<string>();
+    // First, generate all new packets in memory to get their ids
+    const newPackets: Array<{ packet: AgentTaskPacket; path: string }> = [];
     for (const feature of state.scope.mvp_features) {
       const packet = this.packetFor(feature, state, scopeVersion, architectureVersion, candidate);
+      // Use deterministic task_id per feature+scopeVersion to avoid duplicates across re-runs
+      // If packetFor generates a random id, we need to make it deterministic for same feature+version
+      // For now, keep generated id but track for cleanup; we will remove old packets after
+      newTaskIds.add(packet.task_id);
+      const packetPath = join(handoffTasksDir, `${packet.task_id}.yaml`);
+      newPackets.push({ packet, path: packetPath });
+    }
+    // Remove stale packets that are not part of new generation
+    // We need to determine which existing files correspond to old task_ids not in new generation
+    // Since task_ids are random, we cannot match by id, so we remove all existing and rewrite
+    // But to preserve fail-closed, we should remove only after successful generation of new packets
+    // For deterministic ids, we could keep matching ones; for now, remove all old before writing new
+    try {
+      if (existsSync(handoffTasksDir)) {
+        for (const file of readdirSync(handoffTasksDir)) {
+          const fullPath = join(handoffTasksDir, file);
+          // Only remove if it's a yaml file and not one of the new packets (which haven't been written yet)
+          // Since new packets have new random ids, none will match existing, so remove all
+          // This ensures no duplicates across repeated generation
+          if (file.endsWith('.yaml') || file.endsWith('.yml')) {
+            try { unlinkSync(fullPath); } catch {}
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    for (const { packet } of newPackets) {
       const written = this.store.writeArtifact('generated', `handoff/tasks/${packet.task_id}.yaml`, packet);
       if (!written.ok) return written;
       packetPaths.push(written.value);
     }
+    // Update canonical state tasks to track current handoff generation (fail-closed)
+    // Preserve existing task status for same feature when re-generating same scopeVersion
+    const taskUpdate = this.store.update((s) => {
+      const existingByFeature = new Map(s.delivery.tasks.map((t) => [t.feature_id, t]));
+      const existingById = new Map(s.delivery.tasks.map((t) => [t.id, t]));
+      const newTasks: typeof s.delivery.tasks = [];
+      for (const { packet } of newPackets) {
+        const feature = s.scope.mvp_features.find((f) => f.id === packet.feature_id);
+        if (!feature) continue;
+        const existingByFeatureMatch = existingByFeature.get(feature.id);
+        const existingByIdMatch = existingById.get(packet.task_id);
+        const existing = existingByIdMatch ?? existingByFeatureMatch;
+        // If task already exists for same feature and same task_id (deterministic), preserve its status
+        // Otherwise create new pending task
+        if (existing && existing.id === packet.task_id) {
+          // Preserve status if already done/in_progress, but ensure it is tracked
+          newTasks.push(existing);
+        } else if (existing && existing.feature_id === feature.id) {
+          // Same feature but different task_id (old generation) - reset to pending for new generation
+          // But if it was already done and scopeVersion hasn't changed, we could keep done
+          // Since we use deterministic ids per feature+scopeVersion, a different id means different scopeVersion -> reset
+          newTasks.push({
+            id: packet.task_id,
+            title: feature.name,
+            status: 'pending',
+            estimated_hours: feature.estimated_hours,
+            feature_id: feature.id,
+            critical_path: true,
+          });
+        } else {
+          newTasks.push({
+            id: packet.task_id,
+            title: feature.name,
+            status: 'pending',
+            estimated_hours: feature.estimated_hours,
+            feature_id: feature.id,
+            critical_path: true,
+          });
+        }
+      }
+      s.delivery.tasks = newTasks;
+      // Invalidate build verification when new handoff is generated (new implementation work required)
+      // Only invalidate if there was a previous build verification
+      const hasBuildVerification = s.gates.build_gate === 'passed';
+      if (hasBuildVerification) {
+        s.gates.build_gate = 'pending';
+        // Do not automatically advance phase, but ensure we are at least in build
+        if (s.delivery.phase === 'demo' || s.delivery.phase === 'video' || s.delivery.phase === 'judge' || s.delivery.phase === 'submission') {
+          s.delivery.phase = 'build';
+        }
+      }
+      // Ensure phase is at least build (handoff is part of build)
+      if (s.delivery.phase === 'architecture' || s.delivery.phase === 'scaffold') {
+        s.delivery.phase = 'build';
+      }
+    });
+    if (!taskUpdate.ok) return taskUpdate;
     const capability = this.store.writeArtifact('generated', `handoff/${agent}-capability.yaml`, {
       schema_version: '2.1',
       created_at: nowIso(),
@@ -126,6 +232,62 @@ export class AgentBridge {
     if (!evidence.ok) return evidence;
     const written = this.store.writeArtifact('build', `agent-result-${result.task_id}.yaml`, { ...result, evidence_refs: [evidence.value.id] });
     if (!written.ok) return written;
+    // Update canonical task status and invalidate stale build verification (fail-closed)
+    const taskUpdate = this.store.update((s) => {
+      // Find task by task_id or feature_id
+      let task = s.delivery.tasks.find((t) => t.id === value.task_id);
+      if (!task) task = s.delivery.tasks.find((t) => t.feature_id === packet.value.feature_id);
+      if (task) {
+        if (value.status === 'completed') task.status = 'done';
+        else if (value.status === 'blocked') task.status = 'blocked';
+        else if (value.status === 'partial') task.status = 'in_progress';
+        else task.status = 'in_progress';
+      } else {
+        // Tasks were empty (bug) - create tasks for current scope and mark this one as done
+        // Reconstruct tasks from current scope if empty
+        if (s.delivery.tasks.length === 0 && s.scope.mvp_features.length > 0) {
+          for (const feature of s.scope.mvp_features) {
+            const isImported = feature.id === packet.value.feature_id;
+            s.delivery.tasks.push({
+              id: isImported ? value.task_id : `task-${feature.id}-${String(value.scope_version).replace(/[^A-Za-z0-9]/g, '').slice(0, 8) || 'v1'}`,
+              title: feature.name,
+              status: isImported ? (value.status === 'completed' ? 'done' : 'blocked') : 'pending',
+              estimated_hours: feature.estimated_hours,
+              feature_id: feature.id,
+              critical_path: true,
+            });
+          }
+        } else {
+          s.delivery.tasks.push({
+            id: value.task_id,
+            title: packet.value.objective ?? packet.value.feature_id,
+            status: value.status === 'completed' ? 'done' : 'blocked',
+            estimated_hours: 0,
+            feature_id: packet.value.feature_id,
+            critical_path: false,
+          });
+        }
+      }
+      // Invalidate build verification - new implementation changes make previous build stale (fail-closed)
+      if (s.gates.build_gate === 'passed') {
+        s.gates.build_gate = 'pending';
+      }
+      // Ensure phase does not incorrectly advance to demo while tasks remain
+      const hasPendingTasks = s.delivery.tasks.some((t) => t.status !== 'done');
+      if (hasPendingTasks && (s.delivery.phase === 'demo' || s.delivery.phase === 'video' || s.delivery.phase === 'judge' || s.delivery.phase === 'submission')) {
+        s.delivery.phase = 'build';
+      } else if (hasPendingTasks && s.delivery.phase !== 'build' && s.delivery.phase !== 'scaffold' && s.delivery.phase !== 'architecture') {
+        // If tasks are pending and we are not in a later phase, ensure we are in build
+        if (s.delivery.phase === 'complete') s.delivery.phase = 'build';
+      }
+      // If tasks still pending, ensure build_gate is not passed (fail-closed)
+      // Use a separate check to avoid TS narrowing issue
+      const pendingAndPassed = hasPendingTasks && (s.gates.build_gate as string) === 'passed';
+      if (pendingAndPassed) {
+        s.gates.build_gate = 'pending';
+      }
+    });
+    if (!taskUpdate.ok) return taskUpdate;
     return ok({ result: { ...result, evidence_refs: [evidence.value.id] }, evidence_ref: evidence.value.id });
   }
 
@@ -169,6 +331,10 @@ export class AgentBridge {
 
   private packetFor(feature: CompetitionState['scope']['mvp_features'][number], state: CompetitionState, scopeVersion: string, architectureVersion: string, candidate?: any | null): AgentTaskPacket {
     const featureId = feature.id;
+    // Use deterministic task_id per feature+scopeVersion to avoid duplicates across re-runs and allow state tracking
+    // Include full scopeVersion hash to ensure different scope versions get different ids (avoid 8-char collision for test-scope-v1 vs v2)
+    const sanitizedVersion = String(scopeVersion).replace(/[^A-Za-z0-9]/g, '_');
+    const deterministicId = `task-${featureId}-${sanitizedVersion}`;
     // Enrich objective and acceptance with idea semantics when available
     const ideaCtx = candidate ? ` for "${candidate.name}" — ${candidate.core_mechanism?.slice(0, 80) ?? feature.name}` : '';
     const objective = candidate
@@ -196,7 +362,7 @@ export class AgentBridge {
       blockers: [],
       evidence_refs: [],
       verification_status: 'planned',
-      task_id: generateId(`task-${featureId}`),
+      task_id: deterministicId,
       feature_id: featureId,
       scope_version: scopeVersion,
       architecture_version: architectureVersion,

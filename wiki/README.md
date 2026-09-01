@@ -1,6 +1,6 @@
 # HADK Wiki
 
-**Version: 2.1.5**
+**Version: 2.1.6**
 
 HADK is an AI-native competition engineering harness. It turns a competition
 brief or startup thesis into structured artifacts, a scoped build, a reliable
@@ -20,6 +20,14 @@ demo, and a submission package.
 >
 > **v2.1.5** fixes `matchesPattern()` glob corruption (`src/**/attestcoin-batch-pro/**`
 > now correctly matches deep paths; forbidden boundaries not weakened).
+>
+> **v2.1.6** fixes handoff orchestration: `handoff implement` now tracks tasks in
+> `state.yaml`, cleans stale packets, and `handoff import` invalidates `build_gate`
+> fail-closed; `hadk next` no longer jumps to `demo` with pending tasks.
+>
+> **v2.1.6** fixes handoff orchestration: tasks are now tracked in `state.yaml`,
+> stale packets are cleaned, `build_gate` is invalidated on import/generation,
+> and `hadk next` no longer jumps to `demo` with pending tasks.
 
 Choose a workflow:
 

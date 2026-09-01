@@ -2,13 +2,25 @@
 
 ## Baseline
 
-The repository is a pnpm TypeScript monorepo. The baseline on 2026-09-01 (v2.1.5) is:
+The repository is a pnpm TypeScript monorepo. The baseline on 2026-09-01 (v2.1.6) is:
 
 - `pnpm build`: passed
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
-- `pnpm test`: passed, 119 tests (including `tests/competition-propagation.test.ts` + `tests/rich-scope.test.ts` + `tests/agent-bridge-glob.test.ts`)
+- `pnpm test`: passed, 124 tests (including `tests/competition-propagation.test.ts` + `tests/rich-scope.test.ts` + `tests/agent-bridge-glob.test.ts` + `tests/handoff-orchestration.test.ts`)
 - `pnpm validate` (registry): passed, 35 skills, 13 schemas
+
+### v2.1.6 delta (2026-09-01)
+
+- **Handoff orchestration**: `handoff implement` now tracks `delivery.tasks` deterministically
+  (`task-{feature}-{scopeVersion}`), cleans stale `generated/handoff/tasks/*.yaml`, and
+  invalidates `build_gate` on new generation. `handoff import` now updates the
+  canonical task to `done`/`blocked`/`in_progress`, reconstructs tasks if `tasks: []`,
+  invalidates `build_gate` (fail-closed), and ensures `phase` stays `build` while
+  tasks are pending. `Orchestrator` and `validators` now block `build`/`demo` when
+  tasks are pending or `build_gate` is stale, and `hadk next` correctly stays in
+  `build` (`handoff import`/`verify build`) instead of incorrectly advancing to
+  `demo`. Added `tests/handoff-orchestration.test.ts` (5 tests) for full lifecycle.
 
 ### v2.1.5 delta (2026-09-01)
 

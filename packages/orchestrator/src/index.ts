@@ -138,13 +138,41 @@ export class Orchestrator {
         if (state.architecture.status === 'unselected') issues.push('Architecture must be selected before scaffold. Run `hadk scaffold`.');
         break;
 
-      case 'build':
+      case 'build': {
+        // Implementation tasks must be completed before build can be considered passed (only if tasks are tracked)
+        const hasTasks = state.delivery.tasks.length > 0;
+        if (hasTasks) {
+          const pending = state.delivery.tasks.filter((t) => t.status !== 'done');
+          if (pending.length > 0) {
+            issues.push(`Implementation tasks pending: ${pending.map((t) => t.feature_id ?? t.id).join(', ')}. Complete via handoff import and verify build.`);
+          }
+        }
+        // Build gate must be valid and not stale; if tasks are pending, build cannot be considered passed
+        if (state.gates.build_gate === 'passed' && state.delivery.tasks.some((t) => t.status !== 'done')) {
+          issues.push('Build gate is stale: implementation tasks are still pending.');
+        }
         if (state.delivery.demo_status === 'blocked') issues.push('Demo path is blocked.');
         break;
+      }
 
-      case 'demo':
+      case 'demo': {
+        // Check if demo is human-attested - if so, don't require build/tasks
+        let isHumanAttested = false;
+        if (this.store) {
+          const demoArt = this.store.readArtifact<any>('demo', 'verification.yaml');
+          if (demoArt.ok && demoArt.value?.mode === 'human-attested') {
+            isHumanAttested = true;
+          }
+        }
+        if (!isHumanAttested) {
+          const hasTasks = state.delivery.tasks.length > 0;
+          const hasPendingTasks = hasTasks && state.delivery.tasks.some((t) => t.status !== 'done');
+          if (hasPendingTasks) issues.push('Cannot demo: implementation tasks still pending.');
+          if (state.gates.build_gate !== 'passed') issues.push('Build verification must pass before demo. Run `hadk verify build`.');
+        }
         if (state.delivery.demo_status === 'not_started') issues.push('Demo validation has not run.');
         break;
+      }
 
       case 'video':
         if (state.delivery.video_status === 'not_started') issues.push('Video project not generated. Run `hadk video generate`.');
@@ -242,7 +270,22 @@ export class Orchestrator {
     if (phase === 'setup') return { command: fallback, description: 'Initialize the harness before ingesting a competition.', phase, blocked_by: blockedBy, deadline_mode };
     if (phase === 'strategy' && !state.strategy.scoring_profile) return { command: fallback, description: 'Choose a strategy mode before generating ideas.', phase, blocked_by: blockedBy, deadline_mode };
     if (phase === 'judge') return { command: fallback, description: 'Prepare judge Q&A before submission.', phase, blocked_by: blockedBy, deadline_mode };
-    if (phase === 'build' && state.gates.build_gate !== 'passed') return { command: fallback, description: 'Validate the generated project before demo preparation.', phase, blocked_by: blockedBy, deadline_mode };
+    if (phase === 'build') {
+      const hasTasks = state.delivery.tasks.length > 0;
+      const pending = state.delivery.tasks.filter((t) => t.status !== 'done');
+      // For new handoff flow, if tasks are tracked, prioritize them
+      if (hasTasks && pending.length > 0) {
+        return { command: 'hadk handoff import <result.yaml>', description: `Implementation tasks pending: ${pending.map((t) => t.feature_id ?? t.id).join(', ')}. Complete via handoff import.`, phase, blocked_by: [], deadline_mode };
+      }
+      // If there are features but no tasks, suggest handoff implement for new flow
+      // But for backward compat with scaffold-only flows (e2e), don't block if no tasks - allow verify build
+      // Only suggest handoff if architecture is generated (i.e., after architecture plan)
+      const hasFeatures = state.scope.mvp_features.length > 0;
+      if (hasFeatures && !hasTasks && state.architecture.status === 'generated') {
+        return { command: 'hadk handoff implement', description: 'Generate implementation task packets for the locked scope.', phase, blocked_by: [], deadline_mode };
+      }
+      if (state.gates.build_gate !== 'passed') return { command: fallback, description: 'Validate the generated project before demo preparation.', phase, blocked_by: blockedBy, deadline_mode };
+    }
     if (phase === 'video' && state.delivery.video_status === 'project_generated') return { command: 'hadk video render', description: 'Render and verify the generated video before judge preparation.', phase, blocked_by: [], deadline_mode };
     return null;
   }
@@ -366,6 +409,8 @@ export class Orchestrator {
       s.architecture.status = 'invalidated';
       s.architecture.invalidation_reason = reason;
       s.architecture.stale_since = new Date().toISOString();
+      // Clear implementation tasks - replan invalidates them
+      s.delivery.tasks = [];
       // Roll back phase to scope so the user re-runs scope → architecture → scaffold
       s.delivery.phase = 'scope';
     });

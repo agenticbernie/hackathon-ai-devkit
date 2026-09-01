@@ -702,6 +702,8 @@ export async function cmdScope(store: StateStore, opts: { unlock?: boolean }): P
       s.architecture.status = 'invalidated';
       s.architecture.invalidation_reason = 'scope unlocked by user';
       s.architecture.stale_since = new Date().toISOString();
+      // Clear implementation tasks - scope change invalidates them
+      s.delivery.tasks = [];
       if (s.delivery.phase !== 'scope' && s.delivery.phase !== 'setup' && s.delivery.phase !== 'competition-intelligence' && s.delivery.phase !== 'strategy' && s.delivery.phase !== 'idea') {
         s.delivery.phase = 'scope';
       }
@@ -778,6 +780,15 @@ export async function cmdScope(store: StateStore, opts: { unlock?: boolean }): P
     s.scope.primary_wow_moment = scope.scope.primary_wow_moment;
     s.scope.external_dependencies = scope.scope.external_dependencies;
     s.gates.scope_gate = 'passed';
+    // New scope invalidates implementation tasks and build verification (fail-closed)
+    s.delivery.tasks = [];
+    s.gates.build_gate = 'pending';
+    s.gates.demo_gate = 'pending';
+    s.gates.video_gate = 'pending';
+    s.gates.submission_gate = 'pending';
+    s.architecture.status = 'invalidated';
+    s.architecture.invalidation_reason = 'scope locked - new scope requires fresh architecture and tasks';
+    s.architecture.stale_since = new Date().toISOString();
     if (s.delivery.phase === 'scope') s.delivery.phase = 'architecture';
   });
 
@@ -798,6 +809,15 @@ export async function cmdArchitecturePlan(store: StateStore): Promise<void> {
     state.architecture.status = 'generated';
     state.architecture.profile = 'web-ai-fullstack (reference only)';
     state.gates.architecture_gate = 'passed';
+    // Architecture change invalidates build tasks/verification (fail-closed)
+    // Tasks are tied to architecture version, so clear them to force fresh handoff
+    if (state.delivery.tasks.length > 0) {
+      state.delivery.tasks = [];
+    }
+    state.gates.build_gate = 'pending';
+    state.gates.demo_gate = 'pending';
+    state.gates.video_gate = 'pending';
+    state.gates.submission_gate = 'pending';
     if (state.delivery.phase === 'architecture') state.delivery.phase = 'build';
   });
   success(`Architecture plan written: ${written.value}`);
@@ -826,13 +846,23 @@ export async function cmdVerifyBuild(store: StateStore): Promise<void> {
   ensureInitialized(store);
   const loaded = store.load();
   if (!loaded.ok) return fail(loaded.error.message);
+  // Fail-closed: if tasks are tracked, they must be done before build verification
+  const hasPendingTasks = loaded.value.delivery.tasks.some((t) => t.status !== 'done');
+  const hasTasks = loaded.value.delivery.tasks.length > 0;
+  if (hasTasks && hasPendingTasks) {
+    const pending = loaded.value.delivery.tasks.filter((t) => t.status !== 'done').map((t) => t.feature_id).join(', ');
+    return fail(`Implementation tasks still pending: ${pending}. Complete all tasks via handoff import before verifying build.`);
+  }
   const result = await new VerificationRunner({ projectRoot: 'prototype', store }).build();
   if (!result.ok) return fail(errorMessage(result.error), errorHint(result.error));
   const written = store.writeArtifact('build', 'verification.yaml', result.value);
   if (!written.ok) return fail(written.error.message);
   store.update((state) => {
     state.gates.build_gate = result.value.passed ? 'passed' : 'failed';
-    state.delivery.phase = result.value.passed && state.delivery.phase === 'build' ? 'demo' : state.delivery.phase;
+    // Only advance to demo if build passed AND all tasks are done (or no tasks for backward compat with no features)
+    const stillPending = state.delivery.tasks.some((t) => t.status !== 'done');
+    const canAdvance = result.value.passed && !stillPending && state.delivery.phase === 'build';
+    state.delivery.phase = canAdvance ? 'demo' : state.delivery.phase;
     state.verification_status = result.value.passed ? 'verified' : 'blocked';
     state.blockers = result.value.passed ? (state.blockers ?? []) : [...new Set([...(state.blockers ?? []), ...result.value.blockers])];
   });

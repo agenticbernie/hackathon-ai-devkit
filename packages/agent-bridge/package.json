@@ -1,6 +1,6 @@
 {
   "name": "@hadk/agent-bridge",
-  "version": "2.1.5",
+  "version": "2.1.6",
   "description": "Canonical agent-compatible handoff packets for HADK",
   "type": "module",
   "main": "dist/index.js",
