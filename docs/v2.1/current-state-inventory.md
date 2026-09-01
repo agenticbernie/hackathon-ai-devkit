@@ -2,13 +2,18 @@
 
 ## Baseline
 
-The repository is a pnpm TypeScript monorepo. The baseline on 2026-09-01 (v2.1.1) is:
+The repository is a pnpm TypeScript monorepo. The baseline on 2026-09-01 (v2.1.2) is:
 
 - `pnpm build`: passed
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
 - `pnpm test`: passed, 107 tests (including `tests/competition-propagation.test.ts` regression)
 - `pnpm validate` (registry): passed, 35 skills, 13 schemas
+
+### v2.1.2 delta (2026-09-01)
+
+- Deadline ` ET (Extended)` suffix (CTC brief) now normalized to ISO so
+  `remainingHours()` computes `Time remaining: 292.9h` instead of `(unknown)`.
 
 ### v2.1.1 delta (2026-09-01)
 

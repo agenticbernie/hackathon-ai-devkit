@@ -1,6 +1,6 @@
 {
   "name": "@hadk/hyperframes-adapter",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "HeyGen HyperFrames demo video pipeline for HADK — storyboard, composition, render orchestration",
   "type": "module",
   "main": "dist/index.js",

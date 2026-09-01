@@ -1,12 +1,13 @@
 # Architecture Overview
 
-HADK (Hackathon AI DevKit) 2.1.1 is an **AI-native Competition Engineering
+HADK (Hackathon AI DevKit) 2.1.2 is an **AI-native Competition Engineering
 Harness**. It turns any competition brief into a winning strategy, a locked
 MVP scope, an executable project scaffold, a reliable demo, a demo video
 project, and a submission-ready package.
 
 > **v2.1.1** fixes a regression where `hadk brief confirm` left the canonical
-> competition state empty. See `CHANGELOG.md` for the hydration and gate fix.
+> competition state empty. **v2.1.2** additionally normalizes ` ET (Extended)`
+> deadlines to ISO for correct `Time remaining`. See `CHANGELOG.md`.
 
 This document describes the system at a glance. Deeper dives live alongside it:
 

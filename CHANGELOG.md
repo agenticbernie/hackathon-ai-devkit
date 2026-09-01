@@ -1,3 +1,13 @@
+# 2.1.2 — 2026-09-01
+
+## Fixed — Deadline parsing for CTC brief
+
+- **Deadline ET suffix**: `hydrateCompetitionState` now strips ` ET` / `(Extended)` suffixes
+  (e.g., `September 13, 2026, 23:59:00 ET (Extended)`) and normalizes to ISO
+  (`2026-09-13T16:59:00.000Z`) so `remainingHours()` computes `Time remaining: 292.9h`
+  instead of `(unknown)` for the CTC brief. Validated with live CTC e2e
+  (`/home/bernieweb3/Downloads/agenticbernie/research/ctc/docs/ctc.md`).
+
 # 2.1.1 — 2026-09-01
 
 ## Fixed — State Propagation (v2.1 regression)

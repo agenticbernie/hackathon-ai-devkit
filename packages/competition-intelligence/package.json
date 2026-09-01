@@ -1,6 +1,6 @@
 {
   "name": "@hadk/competition-intelligence",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Evidence-aware competition brief ingestion and review",
   "type": "module",
   "main": "dist/index.js",

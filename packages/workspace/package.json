@@ -1,6 +1,6 @@
 {
   "name": "@hadk/workspace",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Confined HADK project workspace facade",
   "type": "module",
   "main": "dist/index.js",

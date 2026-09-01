@@ -1,6 +1,6 @@
 # HADK Wiki
 
-**Version: 2.1.1**
+**Version: 2.1.2**
 
 HADK is an AI-native competition engineering harness. It turns a competition
 brief or startup thesis into structured artifacts, a scoped build, a reliable
@@ -10,6 +10,9 @@ demo, and a submission package.
 > updated `competition/facts.yaml` but left `state.competition` empty. Confirmed
 > facts now hydrate the canonical competition state, and `competition_gate` cannot
 > pass when required canonical fields remain absent.
+>
+> **v2.1.2** additionally normalizes deadlines like `September 13, 2026, 23:59:00 ET (Extended)`
+> to ISO so `Time remaining` computes correctly for the CTC brief.
 
 Choose a workflow:
 

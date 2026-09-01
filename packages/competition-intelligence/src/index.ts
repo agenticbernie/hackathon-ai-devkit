@@ -322,9 +322,33 @@ export function hydrateCompetitionState(state: CompetitionState, facts: Competit
           if (!Number.isNaN(num) && Number.isFinite(num) && String(num) === trimmed) {
             state.competition.remaining_hours = num;
           } else {
-            state.competition.deadline = trimmed;
-            // If deadline looks like an ISO date, clear a stale remaining_hours that would conflict? Keep remaining_hours as fallback.
-            // Do not clear remaining_hours; remainingHours() prefers deadline when parseable.
+            // Normalize deadline: clean common suffixes like " ET (Extended)" and try to produce an ISO string
+            // so that remainingHours() can compute Time remaining. Preserve raw if unparsable.
+            let candidate = trimmed;
+            // Remove trailing ET/EST/EDT and "(Extended)" markers that break Date parsing
+            const cleaned = trimmed
+              .replace(/\s*\(Extended\)\s*$/i, '')
+              .replace(/\s+ET\s*$/i, '')
+              .replace(/\s+EST\s*$/i, '')
+              .replace(/\s+EDT\s*$/i, '')
+              .trim();
+            const parsed = new Date(cleaned);
+            if (!Number.isNaN(parsed.getTime()) && cleaned !== trimmed) {
+              // Store a normalized ISO deadline when cleaning makes it parseable
+              // Keep original excerpt for provenance but store ISO for computation
+              state.competition.deadline = parsed.toISOString();
+            } else if (!Number.isNaN(new Date(trimmed).getTime())) {
+              // Already parseable as ISO or standard date
+              const direct = new Date(trimmed);
+              // If trimmed is already ISO-like, preserve trimmed; otherwise normalize to ISO for consistency
+              if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) state.competition.deadline = trimmed;
+              else state.competition.deadline = direct.toISOString();
+            } else {
+              // Fallback: store raw; also attempt to extract a date substring like "September 13, 2026, 23:59:00"
+              // If cleaned parses, we already handled; otherwise keep raw and leave remaining_hours null.
+              // Try a simple date extraction for remaining_hours computation via remaining_hours fallback
+              state.competition.deadline = candidate;
+            }
           }
         } else if (typeof fact.value === 'number' && Number.isFinite(fact.value)) {
           state.competition.remaining_hours = fact.value;

@@ -1,6 +1,6 @@
 # Hackathon AI DevKit (HADK)
 
-**Version: 2.1.1**
+**Version: 2.1.2**
 
 > **Competition Delivery Control Plane for teams and coding agents.**
 
