@@ -1,6 +1,6 @@
 {
   "name": "@hadk/core",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Core types, constants, and utilities for the HADK competition engineering harness",
   "type": "module",
   "main": "dist/index.js",

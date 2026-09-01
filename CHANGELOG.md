@@ -1,3 +1,32 @@
+# 2.1.1 — 2026-09-01
+
+## Fixed — State Propagation (v2.1 regression)
+
+- **Root cause**: `hadk brief confirm` updated `competition/facts.yaml` but never hydrated
+  `state.competition` (`name`, `deadline`, `tracks`, `judging_criteria`). `hadk ingest`
+  also ignored string `--value` for tracks/judging and always overwrote `deadline` from
+  heuristics, leaving the canonical state empty while `facts.yaml` showed `user_confirmed/high`.
+  `competition_gate` was set from `facts.yaml` status alone, so it reported `passed` while
+  `state`, `hadk status`, `hadk validate`, `strategy`/`idea` handoffs, and downstream phases
+  still saw `Competition:(not ingested)` / `Tracks:none` / `NO_TRACKS` etc.
+- **Fix**: Centralized hydration `hydrateCompetitionState()` in
+  `@hadk/competition-intelligence` (handles comma-separated track lists, single vs. array
+  judging criteria with `user-provided` provenance, and `deadline` vs. `remaining_hours`).
+  `BriefService.capture` and `BriefService.changeFact` now hydrate canonical state and
+  compute `competition_gate` via `isCompetitionCanonicalReady()` + fact status; gate cannot
+  pass when canonical `name`, `tracks`, `judging_criteria`, or `deadline`/`remaining_hours`
+  remain absent. `hadk ingest` now reuses the same hydration and falls back to heuristics
+  only where facts are absent. `StateStore.migrateState` downgrades stale `passed` gates
+  with missing canonical state to `pending`. `Orchestrator.checkGate(competition-intelligence)`
+  now also checks `name` and `deadline`.
+- **Verification**: Added `tests/competition-propagation.test.ts` reproducing the exact
+  8-step bug sequence (ingest → 4 confirms → brief review → strategy → idea handoff),
+  asserting canonical hydration, provenance, gate gating, validator, status, and prompt
+  propagation. Fixed `tests/fixtures/sample-hackathon/brief.md` deadline to future
+  (2026-12-31) so e2e `hadk scope` no longer fails on past-deadline budget. Fixed
+  `tests/reference-project.test.ts` port collision (MCP on 3000) by using 3001.
+- **Build/tests**: `pnpm build` and `pnpm test` (107 tests) pass.
+
 # 2.1.0 — 2026-08-15
 
 ## Productization

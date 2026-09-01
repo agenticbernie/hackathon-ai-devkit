@@ -521,5 +521,19 @@ export function migrateState(raw: CompetitionState): MigrationResult {
     if (state.startup.latest_agent_handoff_artifact === undefined) { state.startup.latest_agent_handoff_artifact = null; changed = true; }
   }
 
+  // v2.1.1 canonical competition gate correction: a passed gate with missing canonical state is invalid.
+  // Downgrade gate to pending if required canonical fields are absent. This repairs stale states
+  // where BriefService previously marked the gate passed without hydrating state.competition.
+  if (state.gates.competition_gate === 'passed') {
+    const hasName = typeof state.competition.name === 'string' && state.competition.name.trim().length > 0;
+    const hasTracks = Array.isArray(state.competition.tracks) && state.competition.tracks.length > 0;
+    const hasCriteria = Array.isArray(state.competition.judging_criteria) && state.competition.judging_criteria.length > 0;
+    const hasDeadline = (state.competition.deadline !== null && String(state.competition.deadline).trim() !== '') || state.competition.remaining_hours !== null;
+    if (!hasName || !hasTracks || !hasCriteria || !hasDeadline) {
+      state.gates.competition_gate = 'pending';
+      changed = true;
+    }
+  }
+
   return { state, changed };
 }

@@ -26,7 +26,7 @@ import { StateStore } from '@hadk/state-store';
 import { Orchestrator, scoreIdea } from '@hadk/orchestrator';
 import { validateRegistry } from '@hadk/validators';
 import { AgentAdapters } from '@hadk/agent-adapters';
-import { BriefService, captureSource } from '@hadk/competition-intelligence';
+import { BriefService, captureSource, hydrateCompetitionState, computeCompetitionGateStatus } from '@hadk/competition-intelligence';
 import { AgentBridge } from '@hadk/agent-bridge';
 import { VerificationRunner } from '@hadk/verification';
 import { SubmissionManager } from '@hadk/submission';
@@ -156,19 +156,24 @@ export async function cmdIngest(
   const artifactPath = store.writeArtifact('competition', 'competition.yaml', artifact);
   if (!artifactPath.ok) return fail(artifactPath.error.message);
 
-  // Update state
+  // Update state — hydrate canonical competition state from confirmed/extracted facts,
+  // preserving provenance, and falling back to heuristic parsing only where facts are absent.
   store.update((s) => {
     const facts = brief.value.facts;
-    const value = (field: string) => facts.find((fact) => fact.field === field && fact.fact_type !== 'rejected')?.value;
-    s.competition.name = typeof value('competition_name') === 'string' ? value('competition_name') as string : parsed.event_metadata.name;
     s.competition.source_url = sourceUrl ?? source;
     s.competition.type = parsed.competition_type;
-    s.competition.tracks = Array.isArray(value('tracks')) ? (value('tracks') as string[]).map((name, index) => ({ id: `track-${index + 1}`, name, description: name, sponsor: null, prize: null, required_tools: [] })) : parsed.tracks;
-    s.competition.judging_criteria = Array.isArray(value('judging_criteria')) ? (value('judging_criteria') as string[]).map((name) => ({ name, weight: null, description: name, source: 'extracted' as const })) : parsed.judging_criteria;
-    s.competition.sponsor_requirements = parsed.sponsor_requirements;
-    s.competition.deadline = parsed.event_metadata.submission_deadline;
-    s.gates.competition_gate = brief.value.status === 'confirmed' ? 'passed' : 'pending';
-    if (brief.value.status === 'confirmed') s.delivery.phase = 'strategy';
+    // First hydrate from facts (handles user_confirmed provenance, comma-separated tracks, etc.)
+    hydrateCompetitionState(s, facts);
+    // Fallback to parsed heuristics only for fields still empty after hydration.
+    if (!s.competition.name && parsed.event_metadata.name) s.competition.name = parsed.event_metadata.name;
+    if (s.competition.tracks.length === 0 && parsed.tracks.length > 0) s.competition.tracks = parsed.tracks;
+    if (s.competition.judging_criteria.length === 0 && parsed.judging_criteria.length > 0) s.competition.judging_criteria = parsed.judging_criteria;
+    if (!s.competition.deadline && parsed.event_metadata.submission_deadline) s.competition.deadline = parsed.event_metadata.submission_deadline;
+    if (s.competition.sponsor_requirements.length === 0 && parsed.sponsor_requirements.length > 0) s.competition.sponsor_requirements = parsed.sponsor_requirements;
+    // Ensure provenance for parsed fallback remains `extracted` (already set by parseBrief).
+    // Gate must not pass when canonical required state remains absent.
+    s.gates.competition_gate = computeCompetitionGateStatus(s, brief.value.status as 'needs_review' | 'confirmed' | 'blocked');
+    if (s.gates.competition_gate === 'passed') s.delivery.phase = 'strategy';
   });
 
   success(`Competition ingested: ${parsed.event_metadata.name ?? '(unknown)'}`);

@@ -1,7 +1,7 @@
 # FutureStack AI Hackathon 2026
 
 event_name: FutureStack AI Hackathon 2026
-deadline: 2026-08-15T18:00:00Z
+deadline: 2026-12-31T18:00:00Z
 duration: 48 hours
 
 ## About

@@ -1,12 +1,25 @@
 {
   "name": "@hadk/verification",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Evidence-backed project, build, and demo verification",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "scripts": { "build": "tsc -p tsconfig.json", "clean": "rm -rf dist *.tsbuildinfo" },
-  "dependencies": { "@hadk/core": "workspace:*", "@hadk/state-store": "workspace:*" },
-  "devDependencies": { "typescript": "^5.7.0" }
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@hadk/core": "workspace:*",
+    "@hadk/state-store": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
 }

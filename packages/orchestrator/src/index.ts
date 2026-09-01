@@ -88,10 +88,18 @@ export class Orchestrator {
     const issues: string[] = [];
 
     switch (phase) {
-      case 'competition-intelligence':
+      case 'competition-intelligence': {
+        if (!state.competition.name) issues.push('No competition name confirmed. Run `hadk brief confirm competition_name --value <name>`.');
         if (state.competition.tracks.length === 0) issues.push('No tracks captured. Run `hadk ingest <url-or-file>`.');
         if (state.competition.judging_criteria.length === 0) issues.push('No judging criteria captured or uncertainty recorded.');
+        if (!state.competition.deadline && state.competition.remaining_hours === null) issues.push('No deadline captured. Run `hadk brief confirm deadline --value <ISO-date>`.');
+        // Gate must also reflect actual gate status: cannot be passed if canonical state missing
+        if (state.gates.competition_gate !== 'passed') {
+          // Report additional context if gate is pending but checkGate issues already cover it
+          if (issues.length === 0) issues.push(`Competition gate is ${state.gates.competition_gate}. Complete brief review and confirm required facts.`);
+        }
         break;
+      }
 
       case 'strategy':
         if (!state.strategy.mode) issues.push('No strategy mode selected. Run `hadk strategy`.');

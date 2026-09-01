@@ -1,6 +1,6 @@
 {
   "name": "@hadk/scaffold-engine",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Scope-driven project scaffold generator for HADK — produces real files from locked scope and profiles",
   "type": "module",
   "main": "dist/index.js",
