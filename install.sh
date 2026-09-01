@@ -2,7 +2,7 @@
 #
 # HADK installer — installs the AI-native Competition Engineering Harness.
 #
-#   curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/215cc4ea08c6c3a4ecf4fc733865c815b8e9f512/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/v2.1.3/install.sh | bash
 #
 # Or, safer (inspect first):
 #   curl -fsSL .../install.sh -o install.sh && less install.sh && bash install.sh
@@ -23,7 +23,7 @@ set -euo pipefail
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 HADK_REPO="${HADK_REPO:-https://github.com/agenticbernie/hackathon-ai-devkit.git}"
-HADK_VERSION="${HADK_VERSION:-215cc4ea08c6c3a4ecf4fc733865c815b8e9f512}"
+HADK_VERSION="${HADK_VERSION:-v2.1.3}"
 HADK_ALLOW_MOVING_REF="${HADK_ALLOW_MOVING_REF:-0}"
 HADK_SHA256="${HADK_SHA256:-}"
 HADK_INSTALL_DIR="${HADK_INSTALL_DIR:-$HOME/.hadk}"
@@ -51,8 +51,8 @@ case "$HADK_VERSION" in
     fi
     ;;
 esac
-if [ "$HADK_ALLOW_MOVING_REF" != "1" ] && ! printf '%s' "$HADK_VERSION" | grep -Eq '^[0-9a-fA-F]{40}$'; then
-  fail "HADK_VERSION must be a full 40-character commit SHA unless HADK_ALLOW_MOVING_REF=1."
+if [ "$HADK_ALLOW_MOVING_REF" != "1" ] && ! printf '%s' "$HADK_VERSION" | grep -Eq '^([0-9a-fA-F]{40}|v[0-9]+\.[0-9]+\.[0-9]+.*)$'; then
+  fail "HADK_VERSION must be a full 40-character commit SHA or a version tag (vX.Y.Z) unless HADK_ALLOW_MOVING_REF=1."
   exit 1
 fi
 

@@ -2,13 +2,18 @@
 
 ## Baseline
 
-The repository is a pnpm TypeScript monorepo. The baseline on 2026-09-01 (v2.1.2) is:
+The repository is a pnpm TypeScript monorepo. The baseline on 2026-09-01 (v2.1.3) is:
 
 - `pnpm build`: passed
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
 - `pnpm test`: passed, 107 tests (including `tests/competition-propagation.test.ts` regression)
 - `pnpm validate` (registry): passed, 35 skills, 13 schemas
+
+### v2.1.3 delta (2026-09-01)
+
+- Installer now accepts `vX.Y.Z` tags and defaults to `v2.1.3`; `curl …/v2.1.3/install.sh | bash`
+  correctly installs `v2.1.3` (previously `v2.1.2` installer pointed to old hash and installed `2.1.0`).
 
 ### v2.1.2 delta (2026-09-01)
 

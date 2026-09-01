@@ -1,3 +1,13 @@
+# 2.1.3 — 2026-09-01
+
+## Fixed — Installer pinning to version tag
+
+- **Installer**: `install.sh`/`update.sh` now accept `vX.Y.Z` tags (previously only 40-char SHA)
+  and default `HADK_VERSION` to `v2.1.3`. `curl …/v2.1.3/install.sh | bash` now correctly
+  installs `v2.1.3` (previously `v2.1.2` tag's installer pointed to `33da63` and installed
+  `2.1.0`). Updated `README`, `MIGRATION`, `docs/guides/*` curl examples to `v2.1.3`.
+- Bumped package versions and `HADK_VERSION` to `2.1.3`.
+
 # 2.1.2 — 2026-09-01
 
 ## Fixed — Deadline parsing for CTC brief

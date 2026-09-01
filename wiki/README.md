@@ -1,6 +1,6 @@
 # HADK Wiki
 
-**Version: 2.1.2**
+**Version: 2.1.3**
 
 HADK is an AI-native competition engineering harness. It turns a competition
 brief or startup thesis into structured artifacts, a scoped build, a reliable

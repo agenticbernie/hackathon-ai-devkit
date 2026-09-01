@@ -3,7 +3,7 @@
 # HADK updater — pulls the latest harness and rebuilds the CLI in place.
 # Idempotent and non-destructive: your .hackathon/ project state is never touched.
 #
-#   curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/215cc4ea08c6c3a4ecf4fc733865c815b8e9f512/update.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/agenticbernie/hackathon-ai-devkit/v2.1.3/update.sh | bash
 #
 # Environment variables:
 #   HADK_INSTALL_DIR  Where the harness source lives (default: $HOME/.hadk)
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 HADK_INSTALL_DIR="${HADK_INSTALL_DIR:-$HOME/.hadk}"
-HADK_VERSION="${HADK_VERSION:-215cc4ea08c6c3a4ecf4fc733865c815b8e9f512}"
+HADK_VERSION="${HADK_VERSION:-v2.1.3}"
 HADK_ALLOW_MOVING_REF="${HADK_ALLOW_MOVING_REF:-0}"
 HADK_SHA256="${HADK_SHA256:-}"
 
@@ -22,8 +22,8 @@ case "$HADK_VERSION" in
     [ "$HADK_ALLOW_MOVING_REF" = "1" ] || { fail "Refusing moving ref '$HADK_VERSION'. Set HADK_ALLOW_MOVING_REF=1 to opt in."; exit 1; }
     ;;
 esac
-if [ "$HADK_ALLOW_MOVING_REF" != "1" ] && ! printf '%s' "$HADK_VERSION" | grep -Eq '^[0-9a-fA-F]{40}$'; then
-  fail "HADK_VERSION must be a full 40-character commit SHA unless HADK_ALLOW_MOVING_REF=1."
+if [ "$HADK_ALLOW_MOVING_REF" != "1" ] && ! printf '%s' "$HADK_VERSION" | grep -Eq '^([0-9a-fA-F]{40}|v[0-9]+\.[0-9]+\.[0-9]+.*)$'; then
+  fail "HADK_VERSION must be a full 40-character commit SHA or a version tag (vX.Y.Z) unless HADK_ALLOW_MOVING_REF=1."
   exit 1
 fi
 
