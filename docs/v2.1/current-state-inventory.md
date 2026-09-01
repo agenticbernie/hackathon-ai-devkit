@@ -2,12 +2,26 @@
 
 ## Baseline
 
-The repository is a pnpm TypeScript monorepo. The baseline on 2026-08-15 is:
+The repository is a pnpm TypeScript monorepo. The baseline on 2026-09-01 (v2.1.1) is:
 
 - `pnpm build`: passed
 - `pnpm typecheck`: passed
 - `pnpm lint`: passed
-- `pnpm test`: passed, 90 tests
+- `pnpm test`: passed, 107 tests (including `tests/competition-propagation.test.ts` regression)
+- `pnpm validate` (registry): passed, 35 skills, 13 schemas
+
+### v2.1.1 delta (2026-09-01)
+
+- Fixed `hadk brief confirm` state propagation: `hydrateCompetitionState()` now
+  populates `state.competition` from `competition/facts.yaml` (comma-separated
+  tracks, single/multi judging criteria with `user-provided` provenance,
+  `deadline` vs. `remaining_hours`). `competition_gate` now requires canonical
+  `name` + `tracks` + `judging_criteria` + `deadline`/`remaining_hours` and
+  cannot pass while canonical state remains absent (migration downgrades stale
+  `passed` gates). `orchestrator` and `hadk ingest` updated to use the same
+  hydration.
+
+The previous baseline on 2026-08-15 was:
 
 ## Existing packages
 

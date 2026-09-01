@@ -14,8 +14,23 @@ available package managers, git, and supported coding agents.
 ```bash
 hadk ingest ./brief.md
 hadk brief review
-hadk brief confirm competition_name
+hadk brief confirm competition_name --value "My Competition 2026"
+hadk brief confirm deadline
+hadk brief confirm tracks --value "Track A, Track B, Track C"
+hadk brief confirm judging_criteria --value "Criterion details; record uncertainty explicitly if rubric is unavailable."
+hadk brief review
+hadk status
 ```
+
+> **v2.1.1**: Brief confirms hydrate `state.competition` directly (including
+> comma-separated track lists and `user-provided` judging provenance). `hadk status`
+> will now show `Competition: <name>` and `Time remaining: <hours>h` instead of
+> `(not ingested)`/`(unknown)`, and `hadk validate competition` will not report
+> `NO_TRACKS` / `NO_RUBRIC` once the required facts are confirmed. The
+> `competition_gate` remains `pending` until canonical `name` + `tracks` +
+> `judging_criteria` + `deadline`/`remaining_hours` are present.
+
+The result is written to:
 
 The result is written to:
 

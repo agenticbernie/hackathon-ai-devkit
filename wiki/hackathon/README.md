@@ -1,7 +1,15 @@
 # Hackathon Wiki
 
+**Version: 2.1.1**
+
 Use this workflow when the deliverable is a time-boxed prototype and the judging
 signal is a working demo.
+
+> **v2.1.1 note**: After `hadk ingest`, confirm required brief facts and verify
+> hydration with `hadk brief review` and `hadk status`. The canonical
+> competition state (`state.competition`) now hydrates directly from
+> `user_confirmed` facts, so `hadk status`, validators, and idea handoffs see the
+> same competition name, tracks, judging criteria, and deadline you confirmed.
 
 ## Workflow
 

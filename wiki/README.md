@@ -1,8 +1,15 @@
 # HADK Wiki
 
+**Version: 2.1.1**
+
 HADK is an AI-native competition engineering harness. It turns a competition
 brief or startup thesis into structured artifacts, a scoped build, a reliable
 demo, and a submission package.
+
+> **v2.1.1** fixes a state-propagation regression where `hadk brief confirm`
+> updated `competition/facts.yaml` but left `state.competition` empty. Confirmed
+> facts now hydrate the canonical competition state, and `competition_gate` cannot
+> pass when required canonical fields remain absent.
 
 Choose a workflow:
 
